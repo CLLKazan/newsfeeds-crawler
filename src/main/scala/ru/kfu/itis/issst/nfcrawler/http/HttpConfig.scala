@@ -9,4 +9,6 @@ package ru.kfu.itis.issst.nfcrawler.http
  */
 trait HttpConfig {
 
+  val hostAccessInterval: Int
+
 }

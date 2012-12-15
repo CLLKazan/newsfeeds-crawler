@@ -2,7 +2,6 @@
  *
  */
 package ru.kfu.itis.issst.nfcrawler.dao
-import ru.kfu.itis.issst.nfcrawler.model.Article
 import java.util.Date
 
 /**
@@ -11,13 +10,15 @@ import java.util.Date
  */
 trait FeedArticleDao {
 
-  def getFeedId(feedUrl: String): Option[Int]
+  def getFeed(feedUrl: String): Option[Feed]
 
-  def persistFeed(feedUrl: String): Int
+  def persistFeed(feed: Feed): Feed
+
+  def updateFeed(feed: Feed)
 
   def getArticle(articleUrl: String): Option[Article]
 
-  def persistArticle(article: Article)
+  def persistArticle(article: Article): Article
 
-  def updateFeedPubDate(pubDate: Date)
+  def updateArticle(article: Article)
 }

@@ -1,15 +1,16 @@
 package ru.kfu.itis.issst.nfcrawler
 import scala.actors.Actor
 import grizzled.slf4j.Logging
-import ru.kfu.itis.issst.nfcrawler.Messages._
-import ru.kfu.itis.issst.nfcrawler.model.ParsedFeedItem
-import ru.kfu.itis.issst.nfcrawler.model.ParsedFeedItem
+import Messages._
+import parser.ParsedFeedItem
+import parser.ParsedFeed
 import java.net.URL
-import ru.kfu.itis.issst.nfcrawler.model.ParsedFeed
+import ru.kfu.itis.issst.nfcrawler.parser.ParsedFeed
 import scala.collection.{ mutable => muta }
-import ru.kfu.itis.issst.nfcrawler.model.Article
+import dao.Article
 import java.util.Date
 import FeedManager._
+import dao.Feed
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -19,22 +20,20 @@ class FeedManager(feedUrl: String,
   daoManager: DaoManager, httpManager: HttpManager, parsingManager: ParsingManager)
   extends Actor with Logging {
 
-  var feedId: Int = -1
-  var parsedFeed: ParsedFeed = null
-  var parsedItemsMap = muta.Map.empty[URL, ParsedFeedItem]
+  private var feed: Feed = null
+  private var parsedFeed: ParsedFeed = null
+  private var parsedItemsMap = muta.Map.empty[URL, ParsedFeedItem]
 
   override def act() {
-    daoManager ! new FeedIdRequest(feedUrl)
+    daoManager ! new FeedRequest(feedUrl)
     loop {
       react {
-        case FeedIdResponse(id, request) => {
-          this.feedId = id
-          assert(request.feedUrl == feedUrl)
-          httpManager ! FeedContentRequest(feedUrl)
+        case FeedResponse(feed, request) => {
+          this.feed = feed
+          assert(feed.url == feedUrl && request.feedUrl == feedUrl)
+          httpManager ! FeedContentRequest(feed.url)
         }
-        case FeedContentResponse(content, request) => {
-          parsingManager ! ContentParsingRequest(content)
-        }
+        case FeedContentResponse(content, request) => handleFeedContent(content)
         case ContentParsingResponse(parsedFeed, request) => {
           this.parsedFeed = parsedFeed
           parsedFeed.items.foreach(item => { parsedItemsMap(item.url) = item })
@@ -47,10 +46,21 @@ class FeedManager(feedUrl: String,
         case ArticleResponse(articleOpt, request) => handleArticle(articleOpt, request.url)
         case ArticlePageResponse(pageContent, request) => handlePageContent(pageContent, request.articleUrl, request.articleId)
         case ExtractTextResponse(text, request) => handleArticleText(text, request.url, request.articleId)
-        case PersistArticleResponse(request) => articlePersisted(request.article)
-        case UpdatePubDateResponse(request) => finished()
+        case PersistArticleResponse(article, request) => articlePersisted(article)
+        case UpdateFeedResponse(request) => {
+          feedUpdated(request.feed)
+          finished()
+        }
       }
     }
+  }
+
+  private def handleFeedContent(content: String) {
+    if (content == null) {
+      error("Can't retrieve content of feed '%s'".format(feedUrl))
+      exit()
+    } else
+      parsingManager ! ContentParsingRequest(content)
   }
 
   private def handleArticle(articleOpt: Option[Article], articleUrl: URL) {
@@ -62,7 +72,7 @@ class FeedManager(feedUrl: String,
 
     val (shouldUpdate, articleIdOpt) = articleOpt match {
       case Some(article) => {
-        assert(article.url == articleUrl && article.feedId == this.feedId)
+        assert(article.url == articleUrl && article.feedId == this.feed.id)
         (isNewer(pi.pubDate, article.pubDate), Option(article.id))
       }
       case None => (true, Option.empty)
@@ -72,7 +82,11 @@ class FeedManager(feedUrl: String,
   }
 
   private def handlePageContent(pageContent: String, url: URL, articleId: Option[Int]) {
-    parsingManager ! ExtractTextRequest(pageContent, url, articleId)
+    if (pageContent == null) {
+      error("Can't retrieve content of page '%s'".format(url))
+      itemProcessed(url)
+    } else
+      parsingManager ! ExtractTextRequest(pageContent, url, articleId)
   }
 
   private def handleArticleText(text: String, url: URL, articleIdOpt: Option[Int]) {
@@ -82,20 +96,30 @@ class FeedManager(feedUrl: String,
     }
     val articleId = articleIdOpt match {
       case Some(x) => x
-      case None => Article.ID_NOT_PERSISTED
+      case None => dao.ID_NOT_PERSISTED
     }
-    val updatedArticle = new Article(articleId, url, pi.pubDate, text, feedId)
+    val updatedArticle = new Article(articleId, url, pi.pubDate, text, feed.id)
     daoManager ! PersistArticleRequest(updatedArticle)
   }
 
   private def articlePersisted(article: Article) {
+    info("Article '%s' was persisted, text size : %s".format(article.url, article.text.length))
+    itemProcessed(article.url)
+  }
+
+  private def itemProcessed(url: URL) {
     // remove from map
-    parsedItemsMap.remove(article.url)
+    parsedItemsMap.remove(url)
     // check whether it is last item
     if (parsedItemsMap.isEmpty) {
       // persist last pub date
-      daoManager ! UpdatePubDateRequest(feedId, parsedFeed.pubDate)
+      val updatedFeed = new Feed(feed.id, feed.url, parsedFeed.pubDate)
+      daoManager ! UpdateFeedRequest(updatedFeed)
     }
+  }
+
+  private def feedUpdated(feed: Feed) {
+    this.feed = feed
   }
 
   private def finished() {

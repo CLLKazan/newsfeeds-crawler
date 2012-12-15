@@ -2,10 +2,11 @@
  *
  */
 package ru.kfu.itis.issst.nfcrawler
-import ru.kfu.itis.issst.nfcrawler.model.ParsedFeed
+import parser.ParsedFeed
 import java.net.URL
-import ru.kfu.itis.issst.nfcrawler.model.Article
+import dao.Article
 import java.util.Date
+import dao.Feed
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -13,18 +14,18 @@ import java.util.Date
  */
 private[nfcrawler] object Messages {
   // dao
-  case class FeedIdRequest(feedUrl: String)
-  case class FeedIdResponse(id: Int, request: FeedIdRequest)
+  case class FeedRequest(feedUrl: String)
+  case class FeedResponse(feed: Feed, request: FeedRequest)
   case class ArticleRequest(url: URL)
   case class ArticleResponse(articleOpt: Option[Article], request: ArticleRequest)
-  case class UpdatePubDateRequest(id: Int, pubDate: Date)
-  case class UpdatePubDateResponse(request: UpdatePubDateRequest)
+  case class UpdateFeedRequest(feed: Feed)
+  case class UpdateFeedResponse(request: UpdateFeedRequest)
   // create OR update article depending on whether article.id is NULL
   case class PersistArticleRequest(article: Article)
-  case class PersistArticleResponse(request: PersistArticleRequest)
+  case class PersistArticleResponse(article: Article, request: PersistArticleRequest)
 
   // http
-  case class FeedContentRequest(feedUrl: String)
+  case class FeedContentRequest(feedUrl: URL)
   case class FeedContentResponse(feedContent: String, request: FeedContentRequest)
   case class ArticlePageRequest(articleUrl: URL, articleId: Option[Int])
   case class ArticlePageResponse(pageContent: String, request: ArticlePageRequest)

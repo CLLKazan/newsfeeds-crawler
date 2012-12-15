@@ -1,7 +1,8 @@
 /**
  *
  */
-package ru.kfu.itis.issst.nfcrawler.model
+package ru.kfu.itis.issst.nfcrawler.parser
+
 import java.net.URL
 import java.util.Date
 
