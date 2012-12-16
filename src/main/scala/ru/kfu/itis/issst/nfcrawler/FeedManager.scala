@@ -16,8 +16,8 @@ import dao.Feed
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class FeedManager(feedUrl: String,
-  daoManager: DaoManager, httpManager: HttpManager, parsingManager: ParsingManager)
+class FeedManager(feedUrl: String, daoManager: DaoManager, httpManager: HttpManager,
+  parsingManager: ParsingManager, extractionManager: ExtractionManager)
   extends Actor with Logging {
 
   private var feed: Feed = null
@@ -34,15 +34,7 @@ class FeedManager(feedUrl: String,
           httpManager ! FeedContentRequest(feed.url)
         }
         case FeedContentResponse(content, request) => handleFeedContent(content)
-        case ContentParsingResponse(parsedFeed, request) => {
-          this.parsedFeed = parsedFeed
-          parsedFeed.items.foreach(item => { parsedItemsMap(item.url) = item })
-          // check each entry
-          for (item <- parsedFeed.items) {
-            daoManager ! ArticleRequest(item.url)
-          }
-
-        }
+        case FeedParsingResponse(parsedFeed, request) => handleParsedFeed(parsedFeed)
         case ArticleResponse(articleOpt, request) => handleArticle(articleOpt, request.url)
         case ArticlePageResponse(pageContent, request) => handlePageContent(pageContent, request.articleUrl, request.articleId)
         case ExtractTextResponse(text, request) => handleArticleText(text, request.url, request.articleId)
@@ -60,7 +52,21 @@ class FeedManager(feedUrl: String,
       error("Can't retrieve content of feed '%s'".format(feedUrl))
       exit()
     } else
-      parsingManager ! ContentParsingRequest(content)
+      parsingManager ! FeedParsingRequest(content)
+  }
+
+  private def handleParsedFeed(parsedFeed: ParsedFeed) {
+    if (parsedFeed == null) {
+      error("Can't parse feed %s".format(feedUrl))
+      exit()
+    } else {
+      this.parsedFeed = parsedFeed
+      parsedFeed.items.foreach(item => { parsedItemsMap(item.url) = item })
+      // check each entry
+      for (item <- parsedFeed.items) {
+        daoManager ! ArticleRequest(item.url)
+      }
+    }
   }
 
   private def handleArticle(articleOpt: Option[Article], articleUrl: URL) {
@@ -81,25 +87,30 @@ class FeedManager(feedUrl: String,
       httpManager ! ArticlePageRequest(articleUrl, articleIdOpt)
   }
 
-  private def handlePageContent(pageContent: String, url: URL, articleId: Option[Int]) {
+  private def handlePageContent(pageContent: String, url: URL, articleId: Option[Long]) {
     if (pageContent == null) {
       error("Can't retrieve content of page '%s'".format(url))
       itemProcessed(url)
     } else
-      parsingManager ! ExtractTextRequest(pageContent, url, articleId)
+      extractionManager ! ExtractTextRequest(pageContent, url, articleId)
   }
 
-  private def handleArticleText(text: String, url: URL, articleIdOpt: Option[Int]) {
-    val pi = parsedItemsMap.get(url) match {
-      case Some(x) => x
-      case None => unknownParsedUrl(url)
+  private def handleArticleText(text: String, url: URL, articleIdOpt: Option[Long]) {
+    if (text != null) {
+      val pi = parsedItemsMap.get(url) match {
+        case Some(x) => x
+        case None => unknownParsedUrl(url)
+      }
+      val articleId = articleIdOpt match {
+        case Some(x) => x
+        case None => dao.ID_NOT_PERSISTED
+      }
+      val updatedArticle = new Article(articleId, url, pi.pubDate, text, feed.id)
+      daoManager ! PersistArticleRequest(updatedArticle)
+    } else {
+      error("Can't extract text from page '%s'".format(url))
+      itemProcessed(url)
     }
-    val articleId = articleIdOpt match {
-      case Some(x) => x
-      case None => dao.ID_NOT_PERSISTED
-    }
-    val updatedArticle = new Article(articleId, url, pi.pubDate, text, feed.id)
-    daoManager ! PersistArticleRequest(updatedArticle)
   }
 
   private def articlePersisted(article: Article) {

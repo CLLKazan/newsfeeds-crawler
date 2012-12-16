@@ -9,3 +9,4 @@
 effective-pom.xml
 effective-settings.xml
 /*/.gwt/
+.cache

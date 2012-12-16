@@ -10,6 +10,9 @@ import java.util.Date
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class Article(val id: Int, val url: URL, val pubDate: Date, val text: String, val feedId: Int) {
+class Article(val id: Long, val url: URL, val pubDate: Date, val text: String, val feedId: Int) {
   require(id == ID_NOT_PERSISTED || id >= 0, "Illegal article id: %s".format(id))
+  require(url != null, "url is null")
+  require(text != null, "text is null")
+  require(feedId != null, "feedID is null")
 }

@@ -7,10 +7,10 @@ import scala.actors.Actor
 import grizzled.slf4j.Logging
 import scala.collection.{ mutable => muta }
 import Messages._
-import dao.impl.MysqlFeedArticleDao
 import java.net.URL
 import dao.Article
 import dao.Feed
+import dao.FeedArticleDao
 import ru.kfu.itis.issst.nfcrawler.{ dao => daopack }
 
 /**
@@ -18,7 +18,7 @@ import ru.kfu.itis.issst.nfcrawler.{ dao => daopack }
  *
  */
 class DaoManager(daoConfig: DaoConfig) extends Actor with Logging {
-  private val dao = MysqlFeedArticleDao.build(daoConfig)
+  private val dao = FeedArticleDao.build(daoConfig)
 
   override def act() {
     loop {
@@ -33,6 +33,7 @@ class DaoManager(daoConfig: DaoConfig) extends Actor with Logging {
           dao.updateFeed(feed)
           sender ! UpdateFeedResponse(msg)
         }
+        case Stop => exit()
       }
     }
   }

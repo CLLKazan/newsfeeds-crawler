@@ -12,6 +12,7 @@ import java.util.Date
  */
 class Feed(val id: Int, val url: URL, val lastPubDate: Date) {
   require(id == ID_NOT_PERSISTED || id >= 0, "Illegal Feed id: %s".format(id))
+  require(url != null, "url is null")
 }
 
 object Feed {

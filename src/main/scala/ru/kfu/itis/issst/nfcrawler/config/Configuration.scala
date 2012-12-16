@@ -10,13 +10,14 @@ import java.io.InputStreamReader
 import ru.kfu.itis.issst.nfcrawler.dao.DaoConfig
 import ru.kfu.itis.issst.nfcrawler.http.HttpConfig
 import ru.kfu.itis.issst.nfcrawler.parser.ParserConfig
+import ru.kfu.itis.issst.nfcrawler.extraction.ExtractionConfig
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
 trait Configuration extends AnyRef
-  with DaoConfig with HttpConfig with ParserConfig {
+  with DaoConfig with HttpConfig with ParserConfig with ExtractionConfig {
   val feeds: Set[String]
 
   override def toString(): String = "feeds: %s".format(feeds.mkString("\n\t", "\n\t", "\n"))
@@ -24,6 +25,11 @@ trait Configuration extends AnyRef
 
 object Configuration {
   val FeedKeyPrefix = "feed."
+  val HostAccessInterval = "http.hostAccessInterval"
+  val HttpWorkersNumber = "http.workersNum"
+  val DbUrl = "db.url"
+  val DbUsername = "db.username"
+  val DbPassword = "db.password"
 
   def fromPropertiesFile(filePath: String): Configuration = {
     val props = new Properties
@@ -40,8 +46,16 @@ object Configuration {
     val feedSet = props.stringPropertyNames()
       .filter(_.startsWith(FeedKeyPrefix))
       .map(props.getProperty(_)).toSet
+    def getProperty(key: String) = props.getProperty(key)
+    def getIntProperty(key: String) = getProperty(key).toInt
     new Configuration() {
-      val feeds = feedSet
+      override val feeds = feedSet
+      override val hostAccessInterval = getIntProperty(HostAccessInterval)
+      override val httpWorkersNumber = getIntProperty(HttpWorkersNumber)
+      override val dbUrl = getProperty(DbUrl)
+      override val dbUserName = getProperty(DbUsername)
+      override val dbPassword = getProperty(DbPassword)
+      override val dbDriverClass = getProperty("com.mysql.jdbc.Driver")
     }
   }
 }

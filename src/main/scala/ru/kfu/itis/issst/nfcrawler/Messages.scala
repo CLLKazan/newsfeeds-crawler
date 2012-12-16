@@ -27,12 +27,17 @@ private[nfcrawler] object Messages {
   // http
   case class FeedContentRequest(feedUrl: URL)
   case class FeedContentResponse(feedContent: String, request: FeedContentRequest)
-  case class ArticlePageRequest(articleUrl: URL, articleId: Option[Int])
+  case class ArticlePageRequest(articleUrl: URL, articleId: Option[Long])
   case class ArticlePageResponse(pageContent: String, request: ArticlePageRequest)
 
   // parsing
-  case class ContentParsingRequest(feedContent: String)
-  case class ContentParsingResponse(parsedFeed: ParsedFeed, request: ContentParsingRequest)
-  case class ExtractTextRequest(pageContent: String, url: URL, articleId: Option[Int])
+  case class FeedParsingRequest(feedContent: String)
+  case class FeedParsingResponse(parsedFeed: ParsedFeed, request: FeedParsingRequest)
+
+  // extraction
+  case class ExtractTextRequest(pageContent: String, url: URL, articleId: Option[Long])
   case class ExtractTextResponse(text: String, request: ExtractTextRequest)
+  
+  // common
+  case object Stop
 }
