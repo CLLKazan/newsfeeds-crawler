@@ -15,7 +15,8 @@ trait ErrorDumping {
   private var idCounter: Int = 0
 
   protected def dumpErrorContent(obj: Any): File = {
-    val dumpFile = new File(dumpFileNamePattern.format(idCounter += 1))
+    idCounter += 1
+    val dumpFile = new File(dumpFileNamePattern.format(idCounter))
     try {
       FileUtils.writeStringToFile(dumpFile, String.valueOf(obj), "utf-8")
       dumpFile

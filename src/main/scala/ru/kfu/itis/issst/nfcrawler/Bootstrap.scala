@@ -6,6 +6,7 @@ import ru.kfu.itis.issst.nfcrawler.config.Configuration
 import grizzled.slf4j.Logging
 import scala.actors.Actor
 import scala.actors.Exit
+import scala.actors.Exit
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -16,7 +17,10 @@ object Bootstrap extends Logging {
   def main(args: Array[String]) {
     if (args.length != 1)
       Predef.error("Usage: <configFilePath>")
-    val config = Configuration.fromPropertiesFile(args(0))
+    start(Configuration.fromPropertiesFile(args(0)))
+  }
+
+  def start(config: Configuration) {
     info("Configuration loaded:\n%s".format(config))
     // create managers
     // -- dao layer
@@ -35,15 +39,19 @@ object Bootstrap extends Logging {
     import Actor._
     val mainActor = actor {
       feedManagers.foreach(link(_))
+      List(daoManager, parsingManager, httpManager, extractionManager)
+        .foreach(link(_))
       var feedsRemaining = feedManagers.size
       loop {
         react {
           case Exit(from, reason) => {
-            if (from.isInstanceOf[FeedManager]) feedsRemaining -= 1
+            if (from.isInstanceOf[FeedManager]) {
+              feedsRemaining -= 1
+              if (reason != 'normal) error("Feed manager exited with reason: %s".format(reason))
+            }
             if (feedsRemaining == 0) {
               info("All feeds have been processed. Shutting down managers...")
-              List(daoManager, parsingManager, httpManager, extractionManager)
-                .foreach(_ ! Messages.Stop)
+              exit(Messages.Shutdown)
             }
           }
         }
@@ -57,6 +65,20 @@ object Bootstrap extends Logging {
     httpManager.start()
     extractionManager.start()
     feedManagers.foreach(_.start())
+
+    // block until main actor exit
+    val exitActor = actor {
+      link(mainActor)
+      receive {
+        case Exit(mainActor, _) =>
+          receive {
+            case WaitForFinish => reply(true)
+          }
+      }
+    }
+    exitActor.trapExit = true
+    exitActor !? WaitForFinish
   }
 
+  private case object WaitForFinish
 }

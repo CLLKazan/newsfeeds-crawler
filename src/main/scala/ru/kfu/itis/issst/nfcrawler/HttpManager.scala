@@ -12,14 +12,17 @@ import scala.collection.{ mutable => muta }
 import scala.actors.OutputChannel
 import scala.collection.mutable.DoubleLinkedList
 import scala.actors.TIMEOUT
+import scala.actors.Exit
+import util.actors.LogExceptionActor
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class HttpManager(config: HttpConfig) extends Actor with Logging { manager =>
+class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { manager =>
 
-  private val httpFacade = HttpFacade.getDefault(config)
+  this.trapExit = true
+  private val httpFacade = HttpFacade.get(config)
   private val hostAccessInterval = config.hostAccessInterval
 
   // keep last access time
@@ -39,19 +42,22 @@ class HttpManager(config: HttpConfig) extends Actor with Logging { manager =>
     loop {
       reactWithin(hostAccessInterval) {
         case msg @ FeedContentRequest(feedUrl) =>
+          debug(msg)
           addTask(feedUrl, sender, new FeedContentResponse(_, msg))
         case msg @ ArticlePageRequest(articleUrl, articleIdOpt) =>
+          debug(msg)
           addTask(articleUrl, sender, new ArticlePageResponse(_, msg))
-        case Downloaded(url, time) => {
+        case msg @ Downloaded(url, time) =>
+          debug(msg)
           hostAccessMap(url.getHost()) = new AccessPerformed(time)
           handleFreeWorker(taskList, sender)
-        }
-        case TIMEOUT => scanTasks()
-        case Stop => {
-          assert(taskList.isEmpty, "Task list is not empty when Stop is got")
-          workers.foreach(_ ! Stop)
-          exit()
-        }
+        case msg @ TIMEOUT =>
+          debug(msg)
+          scanTasks()
+        case Exit(from, Shutdown) =>
+          info("Shutting down...")
+          if (!taskList.isEmpty) error("Task list is not empty when Stop is got")
+          exit(Shutdown)
       }
     }
   }
@@ -95,10 +101,12 @@ class HttpManager(config: HttpConfig) extends Actor with Logging { manager =>
     hostAccessState.timeElapsed >= hostAccessInterval
   }
 
-  private def downloader() = Actor.actor {
-    loop {
-      react {
-        case DownloadTask(url, client, replyBuilder) => {
+  private def downloader(): Actor = Actor.actor {
+    Actor.link(manager)
+    Actor.loop {
+      Actor.react {
+        case msg @ DownloadTask(url, client, replyBuilder) =>
+          debug(msg)
           val content =
             try {
               httpFacade.getContent(url)
@@ -111,8 +119,6 @@ class HttpManager(config: HttpConfig) extends Actor with Logging { manager =>
           val time = System.currentTimeMillis
           client ! replyBuilder(content)
           manager ! Downloaded(url, time)
-        }
-        case Stop => Actor.exit()
       }
     }
   }
@@ -128,6 +134,9 @@ private object AccessInProgress extends AccessState {
   override val timeElapsed = 0L
 }
 private class AccessPerformed(from: Long) extends AccessState {
+  require(from >= 0)
   override def timeElapsed = System.currentTimeMillis - from
 }
-private object AccessNotPerformed extends AccessPerformed(Long.MinValue)
+private object AccessNotPerformed extends AccessState {
+  override val timeElapsed = Long.MaxValue
+}

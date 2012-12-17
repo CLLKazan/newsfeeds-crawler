@@ -9,21 +9,28 @@ import extraction.ExtractionConfig
 import Messages._
 import extraction.TextExtractor
 import util.ErrorDumping
+import scala.actors.Exit
+import ru.kfu.itis.issst.nfcrawler.util.actors.LogExceptionActor
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class ExtractionManager(config: ExtractionConfig) extends Actor with Logging with ErrorDumping {
+class ExtractionManager(config: ExtractionConfig) extends LogExceptionActor with Logging with ErrorDumping {
 
+  this.trapExit = true
   override protected val dumpFileNamePattern = "dump-extraction-%s.txt"
-  private val textExtractor = TextExtractor.getDefault()
+  private val textExtractor = TextExtractor.get(config)
 
   override def act() {
     loop {
       react {
         case msg @ ExtractTextRequest(pageContent, _, _) =>
+          debug(msg)
           sender ! ExtractTextResponse(extractText(pageContent), msg)
+        case Exit(from, Shutdown) =>
+          info("Shutting down...")
+          exit(Shutdown)
       }
     }
   }

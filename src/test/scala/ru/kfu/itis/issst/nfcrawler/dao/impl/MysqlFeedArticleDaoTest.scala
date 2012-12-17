@@ -24,7 +24,7 @@ class MysqlFeedArticleDaoTest extends FunSuite {
     val dbPassword = ""
     val dbUrl = "jdbc:hsqldb:mem:nfcrawler-test;ifexists=true;sql.syntax_mys=true"
   }
-  private val dao = FeedArticleDao.build(daoConfig)
+  private val dao = FeedArticleDao.get(daoConfig)
 
   private val url1 = new URL("http://example.com")
   private val url2 = new URL("http://dot.example.com")

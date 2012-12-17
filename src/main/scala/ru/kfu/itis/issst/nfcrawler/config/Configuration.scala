@@ -11,6 +11,7 @@ import ru.kfu.itis.issst.nfcrawler.dao.DaoConfig
 import ru.kfu.itis.issst.nfcrawler.http.HttpConfig
 import ru.kfu.itis.issst.nfcrawler.parser.ParserConfig
 import ru.kfu.itis.issst.nfcrawler.extraction.ExtractionConfig
+import java.net.URL
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -18,9 +19,15 @@ import ru.kfu.itis.issst.nfcrawler.extraction.ExtractionConfig
  */
 trait Configuration extends AnyRef
   with DaoConfig with HttpConfig with ParserConfig with ExtractionConfig {
-  val feeds: Set[String]
+  val feeds: Set[URL]
 
-  override def toString(): String = "feeds: %s".format(feeds.mkString("\n\t", "\n\t", "\n"))
+  override def toString(): String = ("feeds: %s\n" +
+    "hostAccessInterval: %s\n" +
+    "httpWorkers: %s\n" +
+    "dbUrl: %s\n" +
+    "dbUsername: %s")
+    .format(feeds.mkString("\n\t", "\n\t", ""),
+      hostAccessInterval, httpWorkersNumber, dbUrl, dbUserName)
 }
 
 object Configuration {
@@ -45,7 +52,7 @@ object Configuration {
     }
     val feedSet = props.stringPropertyNames()
       .filter(_.startsWith(FeedKeyPrefix))
-      .map(props.getProperty(_)).toSet
+      .map(urlStr => new URL(props.getProperty(urlStr))).toSet
     def getProperty(key: String) = props.getProperty(key)
     def getIntProperty(key: String) = getProperty(key).toInt
     new Configuration() {

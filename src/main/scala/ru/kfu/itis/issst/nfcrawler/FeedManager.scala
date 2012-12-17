@@ -16,7 +16,7 @@ import dao.Feed
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class FeedManager(feedUrl: String, daoManager: DaoManager, httpManager: HttpManager,
+class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager,
   parsingManager: ParsingManager, extractionManager: ExtractionManager)
   extends Actor with Logging {
 
@@ -25,24 +25,37 @@ class FeedManager(feedUrl: String, daoManager: DaoManager, httpManager: HttpMana
   private var parsedItemsMap = muta.Map.empty[URL, ParsedFeedItem]
 
   override def act() {
+    List(daoManager, httpManager, parsingManager, extractionManager).foreach(link(_))
     daoManager ! new FeedRequest(feedUrl)
     loop {
       react {
-        case FeedResponse(feed, request) => {
+        case msg @ FeedResponse(feed, request) =>
+          debug(msg)
           this.feed = feed
           assert(feed.url == feedUrl && request.feedUrl == feedUrl)
           httpManager ! FeedContentRequest(feed.url)
-        }
-        case FeedContentResponse(content, request) => handleFeedContent(content)
-        case FeedParsingResponse(parsedFeed, request) => handleParsedFeed(parsedFeed)
-        case ArticleResponse(articleOpt, request) => handleArticle(articleOpt, request.url)
-        case ArticlePageResponse(pageContent, request) => handlePageContent(pageContent, request.articleUrl, request.articleId)
-        case ExtractTextResponse(text, request) => handleArticleText(text, request.url, request.articleId)
-        case PersistArticleResponse(article, request) => articlePersisted(article)
-        case UpdateFeedResponse(request) => {
+        case msg @ FeedContentResponse(content, request) =>
+          debug(msg)
+          handleFeedContent(content)
+        case msg @ FeedParsingResponse(parsedFeed, request) =>
+          debug(msg)
+          handleParsedFeed(parsedFeed)
+        case msg @ ArticleResponse(articleOpt, request) =>
+          debug(msg)
+          handleArticle(articleOpt, request.url)
+        case msg @ ArticlePageResponse(pageContent, request) =>
+          debug(msg)
+          handlePageContent(pageContent, request.articleUrl, request.articleId)
+        case msg @ ExtractTextResponse(text, request) =>
+          debug(msg)
+          handleArticleText(text, request.url, request.articleId)
+        case msg @ PersistArticleResponse(article, request) =>
+          debug(msg)
+          articlePersisted(article)
+        case msg @ UpdateFeedResponse(request) =>
+          debug(msg)
           feedUpdated(request.feed)
           finished()
-        }
       }
     }
   }
@@ -83,8 +96,8 @@ class FeedManager(feedUrl: String, daoManager: DaoManager, httpManager: HttpMana
       }
       case None => (true, Option.empty)
     }
-    if (shouldUpdate)
-      httpManager ! ArticlePageRequest(articleUrl, articleIdOpt)
+    if (shouldUpdate) httpManager ! ArticlePageRequest(articleUrl, articleIdOpt)
+    else itemProcessed(articleUrl)
   }
 
   private def handlePageContent(pageContent: String, url: URL, articleId: Option[Long]) {
@@ -134,7 +147,7 @@ class FeedManager(feedUrl: String, daoManager: DaoManager, httpManager: HttpMana
   }
 
   private def finished() {
-    info("All tasks for feed '%s' are performed. Last pub timestamp: %2tY.%2tm.%2td %2tH:%2tM:%2tS:%2tL"
+    info("All tasks for feed '%s' are performed. Last pub timestamp: %s"
       .format(feedUrl, parsedFeed.pubDate))
     // clean state
     parsedItemsMap = null

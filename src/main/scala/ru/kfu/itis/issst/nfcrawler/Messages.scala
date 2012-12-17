@@ -14,7 +14,7 @@ import dao.Feed
  */
 private[nfcrawler] object Messages {
   // dao
-  case class FeedRequest(feedUrl: String)
+  case class FeedRequest(feedUrl: URL)
   case class FeedResponse(feed: Feed, request: FeedRequest)
   case class ArticleRequest(url: URL)
   case class ArticleResponse(articleOpt: Option[Article], request: ArticleRequest)
@@ -37,7 +37,7 @@ private[nfcrawler] object Messages {
   // extraction
   case class ExtractTextRequest(pageContent: String, url: URL, articleId: Option[Long])
   case class ExtractTextResponse(text: String, request: ExtractTextRequest)
-  
-  // common
-  case object Stop
+
+  // this is not a message. Use as an Exit reasons
+  case object Shutdown
 }

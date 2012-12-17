@@ -12,37 +12,45 @@ import dao.Article
 import dao.Feed
 import dao.FeedArticleDao
 import ru.kfu.itis.issst.nfcrawler.{ dao => daopack }
+import scala.actors.Exit
+import util.actors.LogExceptionActor
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class DaoManager(daoConfig: DaoConfig) extends Actor with Logging {
-  private val dao = FeedArticleDao.build(daoConfig)
+class DaoManager(daoConfig: DaoConfig) extends LogExceptionActor with Logging {
+  private val dao = FeedArticleDao.get(daoConfig)
+  this.trapExit = true
 
   override def act() {
     loop {
       react {
         case msg @ FeedRequest(feedUrl) =>
+          debug(msg)
           sender ! FeedResponse(getFeed(feedUrl), msg)
         case msg @ ArticleRequest(articleUrl) =>
+          debug(msg)
           sender ! ArticleResponse(getArticle(articleUrl), msg)
         case msg @ PersistArticleRequest(article) =>
+          debug(msg)
           sender ! PersistArticleResponse(persistArticle(article), msg)
-        case msg @ UpdateFeedRequest(feed) => {
+        case msg @ UpdateFeedRequest(feed) =>
+          debug(msg)
           dao.updateFeed(feed)
           sender ! UpdateFeedResponse(msg)
-        }
-        case Stop => exit()
+        case msg @ Exit(from, Shutdown) =>
+          info("Shutting down...")
+          exit(Shutdown)
       }
     }
   }
 
-  private def getFeed(feedUrl: String): Feed = dao.getFeed(feedUrl) match {
+  private def getFeed(feedUrl: URL): Feed = dao.getFeed(feedUrl.toString()) match {
     case Some(feed) => feed
     case None => {
       // persist feed entity
-      dao.persistFeed(Feed.build(new URL(feedUrl), null))
+      dao.persistFeed(Feed.build(feedUrl, null))
     }
   }
 

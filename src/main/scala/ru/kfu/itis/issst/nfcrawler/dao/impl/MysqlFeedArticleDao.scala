@@ -27,7 +27,7 @@ private[dao] class MysqlFeedArticleDao(val ds: DataSource) extends FeedArticleDa
         )
       )
 
-  override def doPersistFeed(feed: Feed): Feed = {
+  override protected def doPersistFeed(feed: Feed): Feed = {
     val id =
       insertSingle("INSERT INTO feed(url, last_pub_date) VALUES (?,?)", _.getInt(1))(
         _.setString(1, feed.url.toString()),
@@ -55,7 +55,7 @@ private[dao] class MysqlFeedArticleDao(val ds: DataSource) extends FeedArticleDa
         )
       )
 
-  override def doPersistArticle(article: Article): Article = {
+  override protected def doPersistArticle(article: Article): Article = {
     val id = insertSingle("INSERT INTO article(url, pub_date, txt, feed_id) VALUES (?,?,?,?)", _.getLong(1))(
       _.setString(1, article.url.toString),
       setTimestamp(_, 2, article.pubDate),

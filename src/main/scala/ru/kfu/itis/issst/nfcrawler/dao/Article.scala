@@ -14,5 +14,5 @@ class Article(val id: Long, val url: URL, val pubDate: Date, val text: String, v
   require(id == ID_NOT_PERSISTED || id >= 0, "Illegal article id: %s".format(id))
   require(url != null, "url is null")
   require(text != null, "text is null")
-  require(feedId != null, "feedID is null")
+  require(feedId >= 0, "feedID = %s".format(feedId))
 }

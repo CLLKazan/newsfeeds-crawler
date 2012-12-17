@@ -12,22 +12,28 @@ import parser.FeedParser
 import java.io.File
 import ParsingManager._
 import ru.kfu.itis.issst.nfcrawler.util.ErrorDumping
+import scala.actors.Exit
+import ru.kfu.itis.issst.nfcrawler.util.actors.LogExceptionActor
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class ParsingManager(config: ParserConfig) extends Actor with Logging with ErrorDumping {
+class ParsingManager(config: ParserConfig) extends LogExceptionActor with Logging with ErrorDumping {
 
+  this.trapExit = true
   override protected val dumpFileNamePattern = DumpFilePattern
-  val feedParser = FeedParser.getDefault()
+  val feedParser = FeedParser.get(config)
 
   override def act() {
     loop {
       react {
         case msg @ FeedParsingRequest(feedContent) =>
+          debug(msg)
           sender ! FeedParsingResponse(parseFeed(feedContent), msg)
-        case Stop => exit()
+        case Exit(from, Shutdown) =>
+          info("Shutting down...")
+          exit(Shutdown)
       }
     }
   }
