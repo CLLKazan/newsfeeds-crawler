@@ -19,6 +19,10 @@ import java.net.URL
 import DefaultHttpFacade._
 import org.apache.http.HttpResponse
 import org.apache.http.impl.conn.PoolingClientConnectionManager
+import org.apache.http.HttpResponseInterceptor
+import org.apache.http.HttpResponse
+import org.apache.http.protocol.HttpContext
+import org.apache.http.client.entity.GzipDecompressingEntity
 
 /**
  * @author Rinat Gareev
@@ -31,6 +35,21 @@ private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with L
     val conManager = new PoolingClientConnectionManager
     new DefaultHttpClient(conManager, getHttpClientParams())
   }
+  // add gzipped content handler
+  httpClient.addResponseInterceptor(new HttpResponseInterceptor() {
+    override def process(response: HttpResponse, context: HttpContext) {
+      val entity = response.getEntity();
+      if (entity != null) {
+        val ceheader = entity.getContentEncoding();
+        if (ceheader != null) {
+          val codecs = ceheader.getElements();
+          if (codecs.exists(c => "gzip".equalsIgnoreCase(c.getName)))
+            response.setEntity(new GzipDecompressingEntity(response.getEntity()));
+          return ;
+        }
+      }
+    }
+  });
 
   override def getContent(url: URL): String = {
     val httpGet = new HttpGet(url.toURI)
@@ -54,8 +73,8 @@ private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with L
       }
     }
   }
-  
-  override def close(){
+
+  override def close() {
     httpClient.getConnectionManager().shutdown()
   }
 
