@@ -38,6 +38,7 @@ object Bootstrap extends Logging {
     // create main actor
     import Actor._
     val mainActor = actor {
+      // link all actors
       feedManagers.foreach(link(_))
       List(daoManager, parsingManager, httpManager, extractionManager)
         .foreach(link(_))
@@ -45,10 +46,9 @@ object Bootstrap extends Logging {
       loop {
         react {
           case Exit(from, reason) => {
-            if (from.isInstanceOf[FeedManager]) {
+            error("Actor '%s' exited with reason: %s".format(from, reason))
+            if (from.isInstanceOf[FeedManager])
               feedsRemaining -= 1
-              if (reason != 'normal) error("Feed manager exited with reason: %s".format(reason))
-            }
             if (feedsRemaining == 0) {
               info("All feeds have been processed. Shutting down managers...")
               exit(Messages.Shutdown)

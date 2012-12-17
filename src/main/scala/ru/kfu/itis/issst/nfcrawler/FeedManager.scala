@@ -24,6 +24,8 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
   private var parsedFeed: ParsedFeed = null
   private var parsedItemsMap = muta.Map.empty[URL, ParsedFeedItem]
 
+  override val toString = "FeedManager[%s]".format(feedUrl)
+
   override def act() {
     List(daoManager, httpManager, parsingManager, extractionManager).foreach(link(_))
     daoManager ! new FeedRequest(feedUrl)

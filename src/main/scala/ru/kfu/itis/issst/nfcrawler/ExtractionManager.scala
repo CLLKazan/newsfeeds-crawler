@@ -21,6 +21,8 @@ class ExtractionManager(config: ExtractionConfig) extends LogExceptionActor with
   this.trapExit = true
   override protected val dumpFileNamePattern = "dump-extraction-%s.txt"
   private val textExtractor = TextExtractor.get(config)
+  
+  override val toString = "ExtractionManager"
 
   override def act() {
     loop {

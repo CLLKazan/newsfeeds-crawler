@@ -25,6 +25,8 @@ class ParsingManager(config: ParserConfig) extends LogExceptionActor with Loggin
   override protected val dumpFileNamePattern = DumpFilePattern
   val feedParser = FeedParser.get(config)
 
+  override val toString = "ParsingManager"
+
   override def act() {
     loop {
       react {

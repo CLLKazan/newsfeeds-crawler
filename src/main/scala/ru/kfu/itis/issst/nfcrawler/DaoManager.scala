@@ -23,6 +23,8 @@ class DaoManager(daoConfig: DaoConfig) extends LogExceptionActor with Logging {
   private val dao = FeedArticleDao.get(daoConfig)
   this.trapExit = true
 
+  override val toString = "DaoManager"
+
   override def act() {
     loop {
       react {

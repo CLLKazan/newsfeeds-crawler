@@ -183,9 +183,14 @@ class BootstrapTest extends FunSuite with MockitoSugar {
 
     when(dao.getFeed(feedUrl1.toString)).thenReturn(Some(new Feed(100, feedUrl1, null)))
     when(dao.getFeed(feedUrl2.toString)).thenReturn(Some(new Feed(100, feedUrl2, null)))
+    when(dao.getArticle(anyObject())).thenReturn(None)
     when(http.getContent(argThat(urlEndsWith("rss")))).thenAnswer(answer(iom => {
       val url = iom.getArguments()(0).asInstanceOf[URL]
       url.toString + " feed content"
+    }))
+    when(http.getContent(argThat(urlMatches(Pattern.compile("\\d\\d$"))))).thenAnswer(answer(iom => {
+      val url = iom.getArguments()(0).asInstanceOf[URL]
+      url.toString + " article content"
     }))
 
     val parsedFeed1 = new ParsedFeed(new Date(), 1.to(5).toList.map(

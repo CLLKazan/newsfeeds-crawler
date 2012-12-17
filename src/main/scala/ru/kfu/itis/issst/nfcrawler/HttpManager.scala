@@ -37,6 +37,8 @@ class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { m
   freeWorkers ++= workers
 
   private var taskList = DoubleLinkedList.empty[DownloadTask]
+  
+  override val toString = "HttpManager"
 
   override def act() {
     loop {
