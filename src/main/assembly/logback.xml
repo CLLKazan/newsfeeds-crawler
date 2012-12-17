@@ -1,0 +1,22 @@
+<configuration>
+	<appender name="RFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>logs/current.log</file>
+		<append>true</append>
+
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      		<!-- hourly rollover -->
+			<fileNamePattern>logs/%d{yyyy-MM-dd,aux}/nfcrawler-h%d{HH}.log</fileNamePattern>
+		</rollingPolicy>
+
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{25} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<logger name="ru.kfu" level="INFO" />
+	<logger name="ru.ksu" level="INFO" />
+
+	<root level="WARN">
+		<appender-ref ref="RFILE" />
+	</root>
+</configuration>

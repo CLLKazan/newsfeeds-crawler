@@ -18,6 +18,7 @@ import java.io.Reader
 import java.net.URL
 import DefaultHttpFacade._
 import org.apache.http.HttpResponse
+import org.apache.http.impl.conn.PoolingClientConnectionManager
 
 /**
  * @author Rinat Gareev
@@ -25,7 +26,11 @@ import org.apache.http.HttpResponse
  */
 private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with Logging {
 
-  private val httpClient = new DefaultHttpClient(getHttpClientParams())
+  private val httpClient = {
+    // default parameters of PoolingClientConnectionManager seems to be good enough
+    val conManager = new PoolingClientConnectionManager
+    new DefaultHttpClient(conManager, getHttpClientParams())
+  }
 
   override def getContent(url: URL): String = {
     val httpGet = new HttpGet(url.toURI)
@@ -48,6 +53,10 @@ private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with L
         null
       }
     }
+  }
+  
+  override def close(){
+    httpClient.getConnectionManager().shutdown()
   }
 
   private def deallocateConnectionResources(response: HttpResponse) {

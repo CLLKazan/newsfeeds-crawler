@@ -59,6 +59,7 @@ class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { m
         case Exit(from, Shutdown) =>
           info("Shutting down...")
           if (!taskList.isEmpty) error("Task list is not empty when Stop is got")
+          httpFacade.close()
           exit(Shutdown)
       }
     }

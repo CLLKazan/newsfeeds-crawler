@@ -1,0 +1,8 @@
+feed.ex=http://example.com/rss
+feed.ex2=http://example2.com/rss/
+# feed.any-legal-key=feed url
+db.username=foouser
+db.password=bar
+db.url=jdbc:someengine:some
+http.hostAccessInterval=1000
+http.workersNum=3

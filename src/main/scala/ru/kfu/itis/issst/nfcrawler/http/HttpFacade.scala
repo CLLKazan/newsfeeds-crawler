@@ -14,6 +14,8 @@ import nfcrawler.util.SimpleFactory
  */
 trait HttpFacade {
   def getContent(url: URL): String
+  
+  def close()
 }
 
 object HttpFacade extends SimpleFactory[HttpConfig, HttpFacade] {
