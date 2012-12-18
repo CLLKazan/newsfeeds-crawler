@@ -11,6 +11,8 @@ import dao.Article
 import java.util.Date
 import FeedManager._
 import dao.Feed
+import org.apache.commons.lang3.time.DateUtils
+import java.util.Calendar
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -94,7 +96,10 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
     val (shouldUpdate, articleIdOpt) = articleOpt match {
       case Some(article) => {
         assert(article.url == articleUrl && article.feedId == this.feed.id)
-        (isNewer(pi.pubDate, article.pubDate), Option(article.id))
+        val isArticleUpdated = isNewer(pi.pubDate, article.pubDate)
+        if (isArticleUpdated) info("Article '%s' pubDate has changed from %s to %s"
+          .format(articleUrl, article.pubDate, pi.pubDate))
+        (isArticleUpdated, Option(article.id))
       }
       case None => (true, Option.empty)
     }
@@ -166,5 +171,5 @@ object FeedManager {
   private def isNewer(target: Date, arg: Date): Boolean =
     if (target == null) false
     else if (arg == null) true
-    else target.compareTo(arg) > 0
+    else DateUtils.truncatedCompareTo(target, arg, Calendar.SECOND) > 0
 }
