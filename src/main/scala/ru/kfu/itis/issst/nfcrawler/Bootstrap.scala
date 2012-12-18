@@ -46,7 +46,11 @@ object Bootstrap extends Logging {
       loop {
         react {
           case Exit(from, reason) => {
-            error("Actor '%s' exited with reason: %s".format(from, reason))
+            val reportFunc = () => "Actor '%s' exited with reason: %s".format(from, reason)
+            if ('normal != reason)
+              error(reportFunc())
+            else info(reportFunc())
+
             if (from.isInstanceOf[FeedManager])
               feedsRemaining -= 1
             if (feedsRemaining == 0) {
