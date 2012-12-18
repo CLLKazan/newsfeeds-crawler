@@ -10,6 +10,7 @@ import org.apache.commons.io.IOUtils
 import java.util.Date
 import java.sql.Types
 import java.sql.Statement
+import java.sql.Timestamp
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -117,13 +118,14 @@ trait JdbcTemplate {
     }
   }
 
-  protected def setDatetime(stmt: PreparedStatement, param: Int, value: Date): Unit =
-    if (value != null)
-      stmt.setDate(param, new java.sql.Date(value.getTime()))
-    else stmt.setNull(param, Types.TIMESTAMP)
-
   protected def setTimestamp(stmt: PreparedStatement, param: Int, value: Date): Unit =
     if (value != null)
       stmt.setTimestamp(param, new java.sql.Timestamp(value.getTime()))
     else stmt.setNull(param, Types.TIMESTAMP)
+
+  protected def getTimestamp(rs: ResultSet, colName: String): Date =
+    rs.getTimestamp(colName) match {
+      case null => null
+      case x: Timestamp => new Date(x.getTime())
+    }
 }

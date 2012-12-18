@@ -23,7 +23,7 @@ private[dao] class MysqlFeedArticleDao(val ds: DataSource) extends FeedArticleDa
         new Feed(
           rs.getInt("id"),
           new URL(rs.getString("url")),
-          rs.getDate("last_pub_date")
+          getTimestamp(rs, "last_pub_date")
         )
       )
 
@@ -31,7 +31,7 @@ private[dao] class MysqlFeedArticleDao(val ds: DataSource) extends FeedArticleDa
     val id =
       insertSingle("INSERT INTO feed(url, last_pub_date) VALUES (?,?)", _.getInt(1))(
         _.setString(1, feed.url.toString()),
-        setDatetime(_, 2, feed.lastPubDate)
+        setTimestamp(_, 2, feed.lastPubDate)
       )
     new Feed(id, feed.url, feed.lastPubDate)
   }
@@ -39,7 +39,7 @@ private[dao] class MysqlFeedArticleDao(val ds: DataSource) extends FeedArticleDa
   override def updateFeed(feed: Feed) =
     update("UPDATE feed SET url = ?, last_pub_date = ? WHERE id = ?", 1)(
       _.setString(1, feed.url.toString),
-      setDatetime(_, 2, feed.lastPubDate),
+      setTimestamp(_, 2, feed.lastPubDate),
       _.setInt(3, feed.id)
     )
 
@@ -49,7 +49,7 @@ private[dao] class MysqlFeedArticleDao(val ds: DataSource) extends FeedArticleDa
         new Article(
           rs.getLong("id"),
           new URL(rs.getString("url")),
-          rs.getDate("pub_date"),
+          getTimestamp(rs, "pub_date"),
           readClob(rs, "txt"),
           rs.getInt("feed_id")
         )

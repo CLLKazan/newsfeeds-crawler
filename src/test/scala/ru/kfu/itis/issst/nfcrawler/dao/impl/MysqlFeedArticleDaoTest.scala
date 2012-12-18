@@ -9,7 +9,9 @@ import ru.kfu.itis.issst.nfcrawler.dao.{ DaoConfig, FeedArticleDao, Feed, Articl
 import java.net.URL
 import java.util.Date
 import org.apache.commons.lang3.time.DateUtils
+import DateUtils.truncate
 import java.sql.SQLException
+import java.util.Calendar
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -70,11 +72,11 @@ class MysqlFeedArticleDaoTest extends FunSuite {
   }
 
   test("update feed") {
-    val date = DateUtils.parseDate("2000.01.01", "yyyy.MM.dd")
+    val date = DateUtils.parseDate("2000.01.01 22:05", "yyyy.MM.dd HH:mm")
     dao.updateFeed(new Feed(0, url1, date))
     val updated = dao.getFeed(url1.toString())
     assert(updated.isDefined)
-    assert(updated.get.lastPubDate == date)
+    assert(updated.get.lastPubDate === date)
   }
 
   private val url3 = new URL("http://scala-lang.org")
@@ -91,8 +93,10 @@ class MysqlFeedArticleDaoTest extends FunSuite {
     assert(feedId === srcArticle.feedId)
   }
 
+  var article4Date = new Date()
+
   test("persist article with date") {
-    val article4 = new Article(daopkg.ID_NOT_PERSISTED, url4, new Date(), "some text", 1)
+    val article4 = new Article(daopkg.ID_NOT_PERSISTED, url4, article4Date, "some text", 1)
     val persistedArticle = dao.persistArticle(article4)
     import persistedArticle._
     assert(id != daopkg.ID_NOT_PERSISTED)
@@ -123,7 +127,8 @@ class MysqlFeedArticleDaoTest extends FunSuite {
     assert(dbArticle.id != 0)
     assert(dbArticle.url != null)
     assert(dbArticle.text != null)
-    assert(dbArticle.pubDate != null)
+    val secField = Calendar.SECOND
+    assert(truncate(dbArticle.pubDate, secField) === truncate(article4Date, secField))
     assert(dbArticle.feedId != 0)
 
     import dbArticle._
