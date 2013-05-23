@@ -24,16 +24,18 @@ trait Configuration extends AnyRef
   override def toString(): String = ("feeds: %s\n" +
     "hostAccessInterval: %s\n" +
     "httpWorkers: %s\n" +
+    "clientHttpParams: %s\n" +
     "dbUrl: %s\n" +
     "dbUsername: %s")
     .format(feeds.mkString("\n\t", "\n\t", ""),
-      hostAccessInterval, httpWorkersNumber, dbUrl, dbUserName)
+      hostAccessInterval, httpWorkersNumber, clientHttpParams, dbUrl, dbUserName)
 }
 
 object Configuration {
   val FeedKeyPrefix = "feed."
   val HostAccessInterval = "http.hostAccessInterval"
   val HttpWorkersNumber = "http.workersNum"
+  val HttpClientParamPrefix = "httpClient."
   val DbUrl = "db.url"
   val DbUsername = "db.username"
   val DbPassword = "db.password"
@@ -50,19 +52,42 @@ object Configuration {
     } finally {
       fileReader.close()
     }
+    // feed urls
     val feedSet = props.stringPropertyNames()
       .filter(_.startsWith(FeedKeyPrefix))
-      .map(urlStr => new URL(props.getProperty(urlStr))).toSet
+      .map(urlKey => new URL(props.getProperty(urlKey))).toSet
+    // http client params
+    val httpClientMap = props.stringPropertyNames()
+      .filter(_.startsWith(HttpClientParamPrefix))
+      .map(hcPropKey =>
+        hcPropKey.substring(HttpClientParamPrefix.length) ->
+          convertHttpClientPropValue(props.getProperty(hcPropKey)))
+      .toMap
+    // aux methods
     def getProperty(key: String) = props.getProperty(key)
     def getIntProperty(key: String) = getProperty(key).toInt
+    // 
     new Configuration() {
       override val feeds = feedSet
       override val hostAccessInterval = getIntProperty(HostAccessInterval)
       override val httpWorkersNumber = getIntProperty(HttpWorkersNumber)
+      override val clientHttpParams = httpClientMap
       override val dbUrl = getProperty(DbUrl)
       override val dbUserName = getProperty(DbUsername)
       override val dbPassword = getProperty(DbPassword)
       override val dbDriverClass = getProperty("com.mysql.jdbc.Driver")
     }
+  }
+
+  private val ReIntParam = "(\\d+)i".r
+  private val ReLongParam = "(\\d+)l".r
+  private val ReDoubleParam = "(\\d+(?:\\.\\d+)?)d".r
+  private val ReBooleanParam = "(?i)(true|false)".r
+  private def convertHttpClientPropValue(valStr: String): Any = valStr match {
+    case ReIntParam(intStr) => intStr.toInt
+    case ReLongParam(longStr) => longStr.toLong
+    case ReDoubleParam(doubleStr) => doubleStr.toDouble
+    case ReBooleanParam(boolStr) => boolStr.toBoolean
+    case valStr => valStr
   }
 }

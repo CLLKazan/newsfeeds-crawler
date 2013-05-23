@@ -11,5 +11,6 @@ trait HttpConfig {
 
   val httpWorkersNumber: Int
   val hostAccessInterval: Int
-
+  val clientHttpParams: Map[String,Any]
+  
 }

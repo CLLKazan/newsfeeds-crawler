@@ -18,11 +18,13 @@ class DefaultHttpFacadeTest extends FunSuite {
   val facade = HttpFacade.get(new HttpConfig() {
     val httpWorkersNumber = 1
     val hostAccessInterval = 1000
+    val clientHttpParams = Map("http.socket.timeout" -> 10000,
+        "http.connection.timeout" -> 30000)
   })
   assert(facade.isInstanceOf[DefaultHttpFacade])
 
   test("get example.com content") {
-    val content = facade.getContent(new URL("http://example.com"))
+    val content = facade.getContent(new URL("http://www.scala-lang.org"))
     assert(content.length() > 100)
   }
 

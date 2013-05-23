@@ -23,6 +23,8 @@ import org.apache.http.HttpResponseInterceptor
 import org.apache.http.HttpResponse
 import org.apache.http.protocol.HttpContext
 import org.apache.http.client.entity.GzipDecompressingEntity
+import org.apache.http.params.HttpParamsNames
+import scala.collection.JavaConversions.iterableAsScalaIterable
 
 /**
  * @author Rinat Gareev
@@ -35,6 +37,9 @@ private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with L
     val conManager = new PoolingClientConnectionManager
     new DefaultHttpClient(conManager, getHttpClientParams())
   }
+  // print http-client parameters (they can be overridden by request parameters)
+  info("Http parameters of %s:\n%s".format(httpClient.getClass().getSimpleName(),
+    printHttpParams(httpClient.getParams())))
   // add gzipped content handler
   httpClient.addResponseInterceptor(new HttpResponseInterceptor() {
     override def process(response: HttpResponse, context: HttpContext) {
@@ -53,6 +58,8 @@ private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with L
 
   override def getContent(url: URL): String = {
     val httpGet = new HttpGet(url.toURI)
+    debug("Request %s is about to be executed. Parameters:\n%s".format(
+      httpGet, printHttpParams(httpGet.getParams())))
     val response = httpClient.execute(httpGet)
 
     val statusLine = response.getStatusLine()
@@ -89,8 +96,20 @@ private[http] class DefaultHttpFacade(cfg: HttpConfig) extends HttpFacade with L
   private def getHttpClientParams(): HttpParams = {
     val params = new SyncBasicHttpParams()
     DefaultHttpClient.setDefaultHttpParams(params)
+    // set parameters from facade cfg
+    for ((paramName, paramVal) <- cfg.clientHttpParams)
+      params.setParameter(paramName, paramVal)
     params
   }
+
+  private def printHttpParams(params: HttpParams): String = params match {
+    case pNames: HttpParamsNames =>
+      val pValues = for (pname <- pNames.getNames())
+        yield pname -> params.getParameter(pname)
+      pValues.toMap.mkString("\n")
+    case _ => "Unknown subtype of HttpParams: %s".format(params.getClass())
+  }
+
 }
 
 private object DefaultHttpFacade {

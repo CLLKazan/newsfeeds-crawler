@@ -214,6 +214,7 @@ class BootstrapTest extends FunSuite with MockitoSugar {
     val dbUserName = ""
     val dbPassword = ""
     val dbUrl = ""
+    val clientHttpParams = Map("someParam" -> "someValue")
   }
 
   private def withUrl(url: URL): Matcher[Feed] =

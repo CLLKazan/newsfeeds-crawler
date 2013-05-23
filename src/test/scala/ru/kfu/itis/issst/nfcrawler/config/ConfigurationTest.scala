@@ -22,6 +22,12 @@ class ConfigurationTest extends FunSuite {
     assert(dbUrl === "jdbc:someengine:some")
     assert(httpWorkersNumber === 3)
     assert(hostAccessInterval === 1000)
+    assert(clientHttpParams === Map(
+      "someCoolIntParamName" -> 100,
+      "someCoolLongParamName" -> 200l,
+      "someCoolBooleanParamName" -> true,
+      "someCoolDoubleParamName" -> 2.7d,
+      "someCoolStringParamName" -> "someString"))
   }
 
 }

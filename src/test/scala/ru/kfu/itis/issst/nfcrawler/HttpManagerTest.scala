@@ -21,6 +21,8 @@ class HttpManagerTest extends FunSuite {
   private val man = new HttpManager(new HttpConfig() {
     override val httpWorkersNumber = 3
     override val hostAccessInterval = 500
+    override val clientHttpParams = Map(
+      "http.connection.timeout" -> 30000)
   })
 
   test("Concurrent http-client access") {

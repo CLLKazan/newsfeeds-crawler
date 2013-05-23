@@ -22,6 +22,7 @@ object DownloadPage {
     val htmlFacade = HttpFacade.get(new HttpConfig() {
       override val httpWorkersNumber = 0
       override val hostAccessInterval = 1000
+      override val clientHttpParams = Map[String, Any]()
     })
 
     val page = htmlFacade.getContent(url)
