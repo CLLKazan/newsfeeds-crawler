@@ -31,7 +31,7 @@ class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { m
   private val httpWorkersNumber = config.httpWorkersNumber
   require(httpWorkersNumber > 1, "Illegal httpWorkersNumber: %s".format(httpWorkersNumber))
   private val workers =
-    for (val i <- List.range(1, httpWorkersNumber + 1))
+    for (i <- List.range(1, httpWorkersNumber + 1))
       yield downloader()
   private val freeWorkers = muta.Queue.empty[OutputChannel[Any]]
   freeWorkers ++= workers

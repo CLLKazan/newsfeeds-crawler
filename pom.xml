@@ -46,7 +46,7 @@
 			<plugin>
 				<groupId>org.scalatest</groupId>
 				<artifactId>scalatest-maven-plugin</artifactId>
-				<version>1.0-M2</version>
+				<version>1.0-RC2</version>
 				<configuration>
 					<reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
 					<junitxml>.</junitxml>
@@ -96,6 +96,11 @@
 
 
 	<dependencies>
+		<dependency>
+			<groupId>org.scala-lang</groupId>
+			<artifactId>scala-actors</artifactId>
+			<version>2.11.0</version>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
@@ -154,18 +159,13 @@
 		</dependency>
 		<dependency>
 			<groupId>org.clapper</groupId>
-			<artifactId>grizzled-slf4j_2.9.2</artifactId>
-			<version>0.6.10</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>1.7.2</version>
+			<artifactId>grizzled-slf4j_2.11</artifactId>
+			<version>1.0.2</version>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
-			<version>1.0.9</version>
+			<version>1.1.2</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-dbcp</groupId>
@@ -186,8 +186,8 @@
 		</dependency>
 		<dependency>
 			<groupId>org.scalatest</groupId>
-			<artifactId>scalatest_2.9.2</artifactId>
-			<version>1.8</version>
+			<artifactId>scalatest_2.11</artifactId>
+			<version>2.1.4</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -208,6 +208,6 @@
 
 	</repositories>
 	<properties>
-		<scala.version>2.9.2</scala.version>
+		<scala.version>2.11.0</scala.version>
 	</properties>
 </project>
