@@ -3,22 +3,36 @@
  */
 package ru.kfu.itis.issst.nfcrawler
 
-import org.scalatest.FunSuite
 import http.HttpConfig
 import Messages._
 import java.net.URL
-import scala.collection.mutable.LinkedHashSet
 import scala.concurrent.duration._
 import scala.concurrent._
 import akka.actor.Props
+import akka.testkit.TestKit
+import akka.actor.ActorSystem
+import org.scalatest.FunSuiteLike
+import org.scalatest.BeforeAndAfterAll
+import scala.collection.mutable.LinkedHashSet
+import akka.testkit.ImplicitSender
+import com.typesafe.config.ConfigFactory
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class HttpManagerTest extends FunSuite {
+class HttpManagerTest(actSys: ActorSystem) extends TestKit(actSys) with ImplicitSender
+  with FunSuiteLike with BeforeAndAfterAll {
 
-  private val manProps = Props(new HttpManager(new HttpConfig() {
+  def this() {
+    this(ActorSystem("HttpManagerTest", ConfigFactory.load("test-application")))
+  }
+
+  override def afterAll {
+    TestKit.shutdownActorSystem(system)
+  }
+
+  private val httpManProps = Props(new HttpManager(new HttpConfig() {
     override val httpWorkersNumber = 3
     override val hostAccessInterval = 500
     override val clientHttpParams = Map(
@@ -30,36 +44,19 @@ class HttpManagerTest extends FunSuite {
       new URL("http://stackoverflow.com/about"),
       new URL("http://www.scala-lang.org/"))
 
-    val client = ActorDSL.actor(new Actor {
-      def act() {
-        urls.foreach(man ! new ArticlePageRequest(_, None))
-
-        loop {
-          reactWithin(20000) {
-            case ArticlePageResponse(html, request) =>
-              if (html != null) urls -= request.articleUrl
-              if (urls.isEmpty || html == null)
-                receive {
-                  case IsFinished =>
-                    reply(true)
-                    exit
-                }
-            case TIMEOUT => receive {
-              case IsFinished =>
-                reply(true)
-                exit
-            }
-          }
-        }
-      }
-    })
-
-    implicit val timeout = Timeout(36500 days)
-    Await.result(client ? IsFinished, Duration.Inf)
-
-    man ! Exit(null, Shutdown)
-
-    assert(urls === LinkedHashSet.empty[URL])
+    val httpMan = system.actorOf(httpManProps, "httpMan")
+    // send
+    urls.foreach(httpMan ! new ArticlePageRequest(_, None))
+    // expect
+    val responses = receiveN(urls.size, 20000 milliseconds) collect {
+      case apr: ArticlePageResponse => apr
+    }
+    assertResult(urls, "Not all article URLs are handled") {
+      responses.map(_.request.articleUrl).toSet
+    }
+    // chech html != null
+    for (ArticlePageResponse(html, request) <- responses)
+      assert(html != null, s"The response for ${request.articleUrl} contains null html")
   }
 
   private case object IsFinished
