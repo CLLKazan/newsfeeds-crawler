@@ -28,9 +28,9 @@ class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
 
   context.setReceiveTimeout(10 seconds)
 
-  private var feed: Feed = null
-  private var parsedFeed: ParsedFeed = null
-  private var parsedItemsMap = muta.Map.empty[URL, ParsedFeedItem]
+  protected var feed: Feed = null
+  protected var parsedFeed: ParsedFeed = null
+  protected var parsedItemsMap = muta.Map.empty[URL, ParsedFeedItem]
 
   override val toString = "FeedManager[%s]".format(feedUrl)
 
@@ -79,10 +79,15 @@ class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
       context.stop(context.self)
     } else {
       this.parsedFeed = parsedFeed
-      parsedFeed.items.foreach(item => { parsedItemsMap(item.url) = item })
-      // check each entry
-      for (item <- parsedFeed.items) {
-        daoManager ! ArticleRequest(item.url)
+      if (parsedFeed.items == null || parsedFeed.items.isEmpty) {
+        log.info("Parsed feed {} contains no items", feedUrl)
+        finished()
+      } else {
+        parsedFeed.items.foreach(item => { parsedItemsMap(item.url) = item })
+        // check each entry
+        for (item <- parsedFeed.items) {
+          daoManager ! ArticleRequest(item.url)
+        }
       }
     }
   }
