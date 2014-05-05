@@ -11,3 +11,5 @@ effective-settings.xml
 /*/.gwt/
 .cache
 /wrk/
+/dump-extraction-*.txt
+/parsing-error-dump-*.txt

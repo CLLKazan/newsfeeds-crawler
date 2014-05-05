@@ -35,8 +35,6 @@ class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
   override val toString = "FeedManager[%s]".format(feedUrl)
 
   override def preStart() {
-    // TODO
-    // List(daoManager, httpManager, parsingManager, extractionManager).foreach(link(_))
     log.debug("Starting")
   }
 

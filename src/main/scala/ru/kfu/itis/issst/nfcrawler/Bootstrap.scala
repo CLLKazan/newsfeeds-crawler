@@ -43,7 +43,7 @@ object Bootstrap extends Logging {
           daoManager = daoManager,
           httpManager = httpManager,
           parsingManager = parsingManager,
-          extractionManager = extractionManager)), "feedManager:" + url)
+          extractionManager = extractionManager)), "feedManager:" + toLegalActorName(url.toString))
       projectManager ! RegisterManager(feedManager)
     }
     projectManager ! CloseDoors
@@ -51,4 +51,6 @@ object Bootstrap extends Logging {
     info("Everything is up")
     actSys
   }
+
+  private def toLegalActorName(url: String) = url.replaceAll("[^-\\w:@&=+,.!~*'_;]", "_")
 }

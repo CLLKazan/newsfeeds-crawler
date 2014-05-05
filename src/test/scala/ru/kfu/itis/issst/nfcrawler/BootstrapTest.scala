@@ -114,7 +114,9 @@ class BootstrapTest extends FunSuite with MockitoSugar {
 
     val feedUrl1 = new URL("http://1.com/rss")
     val feedUrl2 = new URL("http://2.com/rss")
-
+    // dao expections
+    when(dao.getFeed(feedUrl1.toString)).thenReturn(Some(new Feed(100, feedUrl1, null)))
+    when(dao.getFeed(feedUrl2.toString)).thenReturn(Some(new Feed(100, feedUrl2, null)))
     doThrow(new RuntimeException).when(dao).getArticle(any())
 
     Bootstrap.start(makeConfig(feedUrl1, feedUrl2))
