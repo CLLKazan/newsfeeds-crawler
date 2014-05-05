@@ -2,8 +2,6 @@
  *
  */
 package ru.kfu.itis.issst.nfcrawler
-import scala.actors.Actor
-import grizzled.slf4j.Logging
 import ru.kfu.itis.issst.nfcrawler.parser.ParserConfig
 import Messages._
 import parser.ParsedFeed
@@ -12,32 +10,27 @@ import parser.FeedParser
 import java.io.File
 import ParsingManager._
 import ru.kfu.itis.issst.nfcrawler.util.ErrorDumping
-import scala.actors.Exit
-import ru.kfu.itis.issst.nfcrawler.util.actors.LogExceptionActor
+import akka.actor.Actor
+import akka.actor.ActorLogging
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class ParsingManager(config: ParserConfig) extends LogExceptionActor with Logging with ErrorDumping {
+class ParsingManager(config: ParserConfig) extends Actor with ActorLogging with ErrorDumping {
 
-  this.trapExit = true
   override protected val dumpFileNamePattern = DumpFilePattern
   val feedParser = FeedParser.get(config)
 
   override val toString = "ParsingManager"
 
-  override def act() {
-    loop {
-      react {
-        case msg @ FeedParsingRequest(feedContent) =>
-          debug(msg)
-          sender ! FeedParsingResponse(parseFeed(feedContent), msg)
-        case Exit(from, Shutdown) =>
-          info("Shutting down...")
-          exit(Shutdown)
-      }
-    }
+  override def receive = {
+    case msg @ FeedParsingRequest(feedContent) =>
+      sender ! FeedParsingResponse(parseFeed(feedContent), msg)
+  }
+
+  override def postStop() {
+    log.info("Shutting down...")
   }
 
   private def parseFeed(feedContent: String): ParsedFeed =
@@ -46,7 +39,7 @@ class ParsingManager(config: ParserConfig) extends LogExceptionActor with Loggin
     } catch {
       case ex: Exception => {
         val dumpFile = dumpErrorContent(feedContent)
-        error("Feed parsing error. Check content dump in file %s".format(dumpFile), ex)
+        log.error(ex, "Feed parsing error. Check content dump in file {}", dumpFile)
         null
       }
     }

@@ -4,9 +4,10 @@
 package ru.kfu.itis.issst.nfcrawler
 import ru.kfu.itis.issst.nfcrawler.config.Configuration
 import grizzled.slf4j.Logging
-import scala.actors.Actor
-import scala.actors.Exit
-import scala.actors.Exit
+import scala.concurrent.duration._
+import scala.concurrent._
+import akka.actor.ActorSystem
+import akka.actor.Props
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -20,69 +21,34 @@ object Bootstrap extends Logging {
     start(Configuration.fromPropertiesFile(args(0)))
   }
 
-  def start(config: Configuration) {
+  def start(config: Configuration): ActorSystem = {
     info("Configuration loaded:\n%s".format(config))
+    val actSys = ActorSystem("newsfeeds-crawler")
     // create managers
     // -- dao layer
-    val daoManager = new DaoManager(config)
+    val daoManager = actSys.actorOf(Props(new DaoManager(config)), "daoManager")
     // -- http layer
-    val httpManager = new HttpManager(config)
+    val httpManager = actSys.actorOf(Props(new HttpManager(config)), "httpManager")
     // -- parsing layer
-    val parsingManager = new ParsingManager(config)
+    val parsingManager = actSys.actorOf(Props(new ParsingManager(config)), "parsingManager")
     // -- text extraction layer
-    val extractionManager = new ExtractionManager(config)
-    // -- feed managers
-    val feedManagers = config.feeds.toList.map(
-      new FeedManager(_, daoManager, httpManager, parsingManager, extractionManager))
-
+    val extractionManager = actSys.actorOf(Props(new ExtractionManager(config)), "extractionManager")
     // create main actor
-    import Actor._
-    val mainActor = actor {
-      // link all actors
-      feedManagers.foreach(link(_))
-      List(daoManager, parsingManager, httpManager, extractionManager)
-        .foreach(link(_))
-      var feedsRemaining = feedManagers.size
-      loop {
-        react {
-          case Exit(from, reason) => {
-            val reportFunc = () => "Actor '%s' exited with reason: %s".format(from, reason)
-            if ('normal != reason)
-              error(reportFunc())
-            else info(reportFunc())
-
-            if (from.isInstanceOf[FeedManager])
-              feedsRemaining -= 1
-            if (feedsRemaining == 0) {
-              info("All feeds have been processed. Shutting down managers...")
-              exit(Messages.Shutdown)
-            }
-          }
-        }
-      }
+    val projectManager = actSys.actorOf(Props[ProjectManager])
+    // -- feed managers
+    import ProjectManager._
+    for (url <- config.feeds) {
+      val feedManager = actSys.actorOf(Props(
+        new FeedManager(feedUrl = url,
+          daoManager = daoManager,
+          httpManager = httpManager,
+          parsingManager = parsingManager,
+          extractionManager = extractionManager)), "feedManager:" + url)
+      projectManager ! RegisterManager(feedManager)
     }
-    mainActor.trapExit = true
-
-    // start
-    daoManager.start()
-    parsingManager.start()
-    httpManager.start()
-    extractionManager.start()
-    feedManagers.foreach(_.start())
-
-    // block until main actor exit
-    val exitActor = actor {
-      link(mainActor)
-      receive {
-        case Exit(mainActor, _) =>
-          receive {
-            case WaitForFinish => reply(true)
-          }
-      }
-    }
-    exitActor.trapExit = true
-    exitActor !? WaitForFinish
+    projectManager ! CloseDoors
+    //
+    info("Everything is up")
+    actSys
   }
-
-  private case object WaitForFinish
 }

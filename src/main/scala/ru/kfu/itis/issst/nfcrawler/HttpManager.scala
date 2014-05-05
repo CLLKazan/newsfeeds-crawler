@@ -2,26 +2,26 @@
  *
  */
 package ru.kfu.itis.issst.nfcrawler
-import scala.actors.Actor
-import grizzled.slf4j.Logging
 import http.HttpConfig
 import http.HttpFacade
 import Messages._
 import java.net.URL
 import scala.collection.{ mutable => muta }
-import scala.actors.OutputChannel
 import scala.collection.mutable.DoubleLinkedList
-import scala.actors.TIMEOUT
-import scala.actors.Exit
-import util.actors.LogExceptionActor
+import akka.actor.ActorLogging
+import akka.actor.Actor
+import akka.actor.ActorRef
+import scala.concurrent.duration._
+import akka.actor.ReceiveTimeout
+import HttpManager._
+import akka.actor.Props
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { manager =>
+class HttpManager(config: HttpConfig) extends Actor with ActorLogging { manager =>
 
-  this.trapExit = true
   private val httpFacade = HttpFacade.get(config)
   private val hostAccessInterval = config.hostAccessInterval
 
@@ -33,39 +33,35 @@ class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { m
   private val workers =
     for (i <- List.range(1, httpWorkersNumber + 1))
       yield downloader()
-  private val freeWorkers = muta.Queue.empty[OutputChannel[Any]]
+  private val freeWorkers = muta.Queue.empty[ActorRef]
   freeWorkers ++= workers
 
   private var taskList = DoubleLinkedList.empty[DownloadTask]
-  
+
   override val toString = "HttpManager"
 
-  override def act() {
-    loop {
-      reactWithin(hostAccessInterval) {
-        case msg @ FeedContentRequest(feedUrl) =>
-          debug(msg)
-          addTask(feedUrl, sender, new FeedContentResponse(_, msg))
-        case msg @ ArticlePageRequest(articleUrl, articleIdOpt) =>
-          debug(msg)
-          addTask(articleUrl, sender, new ArticlePageResponse(_, msg))
-        case msg @ Downloaded(url, time) =>
-          debug(msg)
-          hostAccessMap(url.getHost()) = new AccessPerformed(time)
-          handleFreeWorker(taskList, sender)
-        case msg @ TIMEOUT =>
-          debug(msg)
-          scanTasks()
-        case Exit(from, Shutdown) =>
-          info("Shutting down...")
-          if (!taskList.isEmpty) error("Task list is not empty when Stop is got")
-          httpFacade.close()
-          exit(Shutdown)
-      }
-    }
+  context.setReceiveTimeout(hostAccessInterval milliseconds)
+
+  override def receive = {
+    case msg @ FeedContentRequest(feedUrl) =>
+      addTask(feedUrl, sender, new FeedContentResponse(_, msg))
+    case msg @ ArticlePageRequest(articleUrl, articleIdOpt) =>
+      addTask(articleUrl, sender, new ArticlePageResponse(_, msg))
+    case msg @ Downloaded(url, time) =>
+      hostAccessMap(url.getHost()) = new AccessPerformed(time)
+      handleFreeWorker(taskList, sender)
+    case ReceiveTimeout =>
+      scanTasks()
   }
 
-  private def addTask(url: URL, client: OutputChannel[Any], replyBuilder: (String) => Any) {
+  override def postStop() {
+    log.info("Shutting down...")
+    if (!taskList.isEmpty)
+      log.error("Task list is not empty when Stop is got")
+    httpFacade.close()
+  }
+
+  private def addTask(url: URL, client: ActorRef, replyBuilder: (String) => Any) {
     taskList = taskList append DoubleLinkedList(DownloadTask(url, client, replyBuilder))
 
     scanTasks()
@@ -76,7 +72,7 @@ class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { m
       handleFreeWorker(taskList, freeWorkers.dequeue)
   }
 
-  private def handleFreeWorker(taskList: DoubleLinkedList[DownloadTask], worker: OutputChannel[Any]) {
+  private def handleFreeWorker(taskList: DoubleLinkedList[DownloadTask], worker: ActorRef) {
     if (taskList.isEmpty) {
       // queue free worker
       freeWorkers += worker
@@ -104,42 +100,44 @@ class HttpManager(config: HttpConfig) extends LogExceptionActor with Logging { m
     hostAccessState.timeElapsed >= hostAccessInterval
   }
 
-  private def downloader(): Actor = Actor.actor {
-    Actor.link(manager)
-    Actor.loop {
-      Actor.react {
-        case msg @ DownloadTask(url, client, replyBuilder) =>
-          debug(msg)
-          val content =
-            try {
-              httpFacade.getContent(url)
-            } catch {
-              case ex: Exception => {
-                error("Error while downloading %s".format(url), ex)
-                null
-              }
+  private def downloader(): ActorRef = context.actorOf(
+    Props(classOf[HttpDownloader], httpFacade))
+}
+
+object HttpManager {
+  private class HttpDownloader(private val httpFacade: HttpFacade)
+    extends Actor with ActorLogging {
+    override def receive = {
+      case DownloadTask(url, client, replyBuilder) =>
+        val content =
+          try {
+            httpFacade.getContent(url)
+          } catch {
+            case ex: Exception => {
+              log.error(ex, "Error while downloading {}", url)
+              null
             }
-          val time = System.currentTimeMillis
-          client ! replyBuilder(content)
-          manager ! Downloaded(url, time)
-      }
+          }
+        val time = System.currentTimeMillis
+        client ! replyBuilder(content)
+        sender ! Downloaded(url, time)
     }
   }
-}
 
-private case class Downloaded(url: URL, timestamp: Long)
-private case class DownloadTask(url: URL, client: OutputChannel[Any], replyBuilder: (String) => Any)
+  private case class Downloaded(url: URL, timestamp: Long)
+  private case class DownloadTask(url: URL, client: ActorRef, replyBuilder: (String) => Any)
 
-private abstract class AccessState {
-  def timeElapsed: Long
-}
-private object AccessInProgress extends AccessState {
-  override val timeElapsed = 0L
-}
-private class AccessPerformed(from: Long) extends AccessState {
-  require(from >= 0)
-  override def timeElapsed = System.currentTimeMillis - from
-}
-private object AccessNotPerformed extends AccessState {
-  override val timeElapsed = Long.MaxValue
+  private abstract class AccessState {
+    def timeElapsed: Long
+  }
+  private object AccessInProgress extends AccessState {
+    override val timeElapsed = 0L
+  }
+  private class AccessPerformed(from: Long) extends AccessState {
+    require(from >= 0)
+    override def timeElapsed = System.currentTimeMillis - from
+  }
+  private object AccessNotPerformed extends AccessState {
+    override val timeElapsed = Long.MaxValue
+  }
 }

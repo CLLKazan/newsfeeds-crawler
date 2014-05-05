@@ -3,8 +3,6 @@
  */
 package ru.kfu.itis.issst.nfcrawler
 import dao.DaoConfig
-import scala.actors.Actor
-import grizzled.slf4j.Logging
 import scala.collection.{ mutable => muta }
 import Messages._
 import java.net.URL
@@ -12,40 +10,32 @@ import dao.Article
 import dao.Feed
 import dao.FeedArticleDao
 import ru.kfu.itis.issst.nfcrawler.{ dao => daopack }
-import scala.actors.Exit
-import util.actors.LogExceptionActor
+import akka.actor.ActorLogging
+import akka.actor.Actor
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class DaoManager(daoConfig: DaoConfig) extends LogExceptionActor with Logging {
+class DaoManager(daoConfig: DaoConfig) extends Actor with ActorLogging {
   private val dao = FeedArticleDao.get(daoConfig)
-  this.trapExit = true
 
   override val toString = "DaoManager"
 
-  override def act() {
-    loop {
-      react {
-        case msg @ FeedRequest(feedUrl) =>
-          debug(msg)
-          sender ! FeedResponse(getFeed(feedUrl), msg)
-        case msg @ ArticleRequest(articleUrl) =>
-          debug(msg)
-          sender ! ArticleResponse(getArticle(articleUrl), msg)
-        case msg @ PersistArticleRequest(article) =>
-          debug(msg)
-          sender ! PersistArticleResponse(persistArticle(article), msg)
-        case msg @ UpdateFeedRequest(feed) =>
-          debug(msg)
-          dao.updateFeed(feed)
-          sender ! UpdateFeedResponse(msg)
-        case msg @ Exit(from, Shutdown) =>
-          info("Shutting down...")
-          exit(Shutdown)
-      }
-    }
+  override def receive = {
+    case msg @ FeedRequest(feedUrl) =>
+      sender ! FeedResponse(getFeed(feedUrl), msg)
+    case msg @ ArticleRequest(articleUrl) =>
+      sender ! ArticleResponse(getArticle(articleUrl), msg)
+    case msg @ PersistArticleRequest(article) =>
+      sender ! PersistArticleResponse(persistArticle(article), msg)
+    case msg @ UpdateFeedRequest(feed) =>
+      dao.updateFeed(feed)
+      sender ! UpdateFeedResponse(msg)
+  }
+
+  override def postStop() {
+    log.info("Shutting down...")
   }
 
   private def getFeed(feedUrl: URL): Feed = dao.getFeed(feedUrl.toString()) match {

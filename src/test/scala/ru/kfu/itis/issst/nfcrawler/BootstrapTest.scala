@@ -22,8 +22,8 @@ import org.mockito.Matchers._
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.hamcrest.CustomTypeSafeMatcher
-import scala.actors.Actor
 import java.util.regex.Pattern
+import scala.concurrent.Await
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -93,7 +93,7 @@ class BootstrapTest extends FunSuite with MockitoSugar {
       src + " w/o boilerplate"
     }))
 
-    Bootstrap.start(makeConfig(feedUrl1, feedUrl2))
+    Bootstrap.start(makeConfig(feedUrl1, feedUrl2)).awaitTermination
 
     // verify
     verify(dao, times(2)).updateFeed(any())

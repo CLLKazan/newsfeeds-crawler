@@ -1,6 +1,4 @@
 package ru.kfu.itis.issst.nfcrawler
-import scala.actors.Actor
-import grizzled.slf4j.Logging
 import Messages._
 import parser.ParsedFeedItem
 import parser.ParsedFeed
@@ -13,14 +11,22 @@ import FeedManager._
 import dao.Feed
 import org.apache.commons.lang3.time.DateUtils
 import java.util.Calendar
+import akka.actor.ActorRef
+import akka.event.Logging
+import akka.actor.Actor
+import akka.actor.ActorLogging
+import scala.concurrent.duration._
+import akka.actor.ReceiveTimeout
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager,
-  parsingManager: ParsingManager, extractionManager: ExtractionManager)
-  extends Actor with Logging {
+class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
+  parsingManager: ActorRef, extractionManager: ActorRef)
+  extends Actor with ActorLogging {
+
+  context.setReceiveTimeout(10 seconds)
 
   private var feed: Feed = null
   private var parsedFeed: ParsedFeed = null
@@ -28,54 +34,51 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
 
   override val toString = "FeedManager[%s]".format(feedUrl)
 
-  override def act() {
-    List(daoManager, httpManager, parsingManager, extractionManager).foreach(link(_))
-    daoManager ! new FeedRequest(feedUrl)
-    loop {
-      react {
-        case msg @ FeedResponse(feed, request) =>
-          debug(msg)
-          this.feed = feed
-          assert(feed.url == feedUrl && request.feedUrl == feedUrl)
-          httpManager ! FeedContentRequest(feed.url)
-        case msg @ FeedContentResponse(content, request) =>
-          debug(msg)
-          handleFeedContent(content)
-        case msg @ FeedParsingResponse(parsedFeed, request) =>
-          debug(msg)
-          handleParsedFeed(parsedFeed)
-        case msg @ ArticleResponse(articleOpt, request) =>
-          debug(msg)
-          handleArticle(articleOpt, request.url)
-        case msg @ ArticlePageResponse(pageContent, request) =>
-          debug(msg)
-          handlePageContent(pageContent, request.articleUrl, request.articleId)
-        case msg @ ExtractTextResponse(text, request) =>
-          debug(msg)
-          handleArticleText(text, request.url, request.articleId)
-        case msg @ PersistArticleResponse(article, request) =>
-          debug(msg)
-          articlePersisted(article)
-        case msg @ UpdateFeedResponse(request) =>
-          debug(msg)
-          feedUpdated(request.feed)
-          finished()
-      }
-    }
+  override def preStart() {
+    // TODO
+    // List(daoManager, httpManager, parsingManager, extractionManager).foreach(link(_))
+    log.debug("Starting")
+  }
+
+  override def receive() = {
+    case Initialize =>
+      daoManager ! new FeedRequest(feedUrl)
+    case msg @ FeedResponse(feed, request) =>
+      this.feed = feed
+      assert(feed.url == feedUrl && request.feedUrl == feedUrl)
+      httpManager ! FeedContentRequest(feed.url)
+    case msg @ FeedContentResponse(content, request) =>
+      handleFeedContent(content)
+    case msg @ FeedParsingResponse(parsedFeed, request) =>
+      handleParsedFeed(parsedFeed)
+    case msg @ ArticleResponse(articleOpt, request) =>
+      handleArticle(articleOpt, request.url)
+    case msg @ ArticlePageResponse(pageContent, request) =>
+      handlePageContent(pageContent, request.articleUrl, request.articleId)
+    case msg @ ExtractTextResponse(text, request) =>
+      handleArticleText(text, request.url, request.articleId)
+    case msg @ PersistArticleResponse(article, request) =>
+      articlePersisted(article)
+    case msg @ UpdateFeedResponse(request) =>
+      feedUpdated(request.feed)
+      finished()
+    case ReceiveTimeout =>
+      log.warning("Starving...")
   }
 
   private def handleFeedContent(content: String) {
     if (content == null) {
-      error("Can't retrieve content of feed '%s'".format(feedUrl))
-      exit()
+      log.error("Can't retrieve content of feed '{}'", feedUrl)
+      context.stop(context.self)
     } else
       parsingManager ! FeedParsingRequest(content)
   }
 
   private def handleParsedFeed(parsedFeed: ParsedFeed) {
     if (parsedFeed == null) {
-      error("Can't parse feed %s".format(feedUrl))
-      exit()
+      // TODO persist this type of errors for analysis
+      log.error("Can't parse feed {}", feedUrl)
+      context.stop(context.self)
     } else {
       this.parsedFeed = parsedFeed
       parsedFeed.items.foreach(item => { parsedItemsMap(item.url) = item })
@@ -97,8 +100,9 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
       case Some(article) => {
         assert(article.url == articleUrl && article.feedId == this.feed.id)
         val isArticleUpdated = isNewer(pi.pubDate, article.pubDate)
-        if (isArticleUpdated) info("Article '%s' pubDate has changed from %s to %s"
-          .format(articleUrl, article.pubDate, pi.pubDate))
+        if (isArticleUpdated)
+          log.info("Article '{}' pubDate has changed from {} to {}",
+            articleUrl, article.pubDate, pi.pubDate)
         (isArticleUpdated, Option(article.id))
       }
       case None => (true, Option.empty)
@@ -109,7 +113,7 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
 
   private def handlePageContent(pageContent: String, url: URL, articleId: Option[Long]) {
     if (pageContent == null) {
-      error("Can't retrieve content of page '%s'".format(url))
+      log.error("Can't retrieve content of page '{}'", url)
       itemProcessed(url)
     } else
       extractionManager ! ExtractTextRequest(pageContent, url, articleId)
@@ -128,13 +132,13 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
       val updatedArticle = new Article(articleId, url, pi.pubDate, text, feed.id)
       daoManager ! PersistArticleRequest(updatedArticle)
     } else {
-      error("Can't extract text from page '%s'".format(url))
+      log.error("Can't extract text from page '{}'", url)
       itemProcessed(url)
     }
   }
 
   private def articlePersisted(article: Article) {
-    info("Article '%s' was persisted, text size : %s".format(article.url, article.text.length))
+    log.info("Article '{}' was persisted, text size : {}", article.url, article.text.length)
     itemProcessed(article.url)
   }
 
@@ -154,12 +158,12 @@ class FeedManager(feedUrl: URL, daoManager: DaoManager, httpManager: HttpManager
   }
 
   private def finished() {
-    info("All tasks for feed '%s' are performed. Last pub timestamp: %s"
-      .format(feedUrl, parsedFeed.pubDate))
+    log.info("All tasks for feed '{}' are performed. Last pub timestamp: {}",
+      feedUrl, parsedFeed.pubDate)
     // clean state
     parsedItemsMap = null
     parsedFeed = null
-    exit()
+    context.stop(context.self)
   }
 
   private def unknownParsedUrl(url: URL): Nothing = throw new IllegalStateException(

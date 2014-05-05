@@ -13,6 +13,8 @@ import dao.Feed
  *
  */
 private[nfcrawler] object Messages {
+  // common
+  case object Initialize
   // dao
   case class FeedRequest(feedUrl: URL)
   case class FeedResponse(feed: Feed, request: FeedRequest)
