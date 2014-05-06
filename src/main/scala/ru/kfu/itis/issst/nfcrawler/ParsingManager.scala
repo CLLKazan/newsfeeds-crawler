@@ -12,6 +12,7 @@ import ParsingManager._
 import ru.kfu.itis.issst.nfcrawler.util.ErrorDumping
 import akka.actor.Actor
 import akka.actor.ActorLogging
+import akka.event.LoggingReceive
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -24,7 +25,7 @@ class ParsingManager(config: ParserConfig) extends Actor with ActorLogging with 
 
   override val toString = "ParsingManager"
 
-  override def receive = {
+  override def receive = LoggingReceive {
     case msg @ FeedParsingRequest(feedContent) =>
       sender ! FeedParsingResponse(parseFeed(feedContent), msg)
   }

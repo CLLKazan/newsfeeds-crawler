@@ -9,6 +9,7 @@ import extraction.TextExtractor
 import util.ErrorDumping
 import akka.actor.Actor
 import akka.actor.ActorLogging
+import akka.event.LoggingReceive
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -21,7 +22,7 @@ class ExtractionManager(config: ExtractionConfig) extends Actor with ActorLoggin
 
   override val toString = "ExtractionManager"
 
-  override def receive = {
+  override def receive = LoggingReceive {
     case msg @ ExtractTextRequest(pageContent, _, _) =>
       sender ! ExtractTextResponse(extractText(pageContent), msg)
   }

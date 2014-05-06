@@ -17,6 +17,7 @@ import akka.actor.Actor
 import akka.actor.ActorLogging
 import scala.concurrent.duration._
 import akka.actor.ReceiveTimeout
+import akka.event.LoggingReceive
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -38,26 +39,26 @@ class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
     log.debug("Starting")
   }
 
-  override def receive() = {
+  override def receive() = LoggingReceive {
     case Initialize =>
       daoManager ! new FeedRequest(feedUrl)
-    case msg @ FeedResponse(feed, request) =>
+    case FeedResponse(feed, request) =>
       this.feed = feed
       assert(feed.url == feedUrl && request.feedUrl == feedUrl)
       httpManager ! FeedContentRequest(feed.url)
-    case msg @ FeedContentResponse(content, request) =>
+    case FeedContentResponse(content, request) =>
       handleFeedContent(content)
-    case msg @ FeedParsingResponse(parsedFeed, request) =>
+    case FeedParsingResponse(parsedFeed, request) =>
       handleParsedFeed(parsedFeed)
-    case msg @ ArticleResponse(articleOpt, request) =>
+    case ArticleResponse(articleOpt, request) =>
       handleArticle(articleOpt, request.url)
-    case msg @ ArticlePageResponse(pageContent, request) =>
+    case ArticlePageResponse(pageContent, request) =>
       handlePageContent(pageContent, request.articleUrl, request.articleId)
-    case msg @ ExtractTextResponse(text, request) =>
+    case ExtractTextResponse(text, request) =>
       handleArticleText(text, request.url, request.articleId)
-    case msg @ PersistArticleResponse(article, request) =>
+    case PersistArticleResponse(article, request) =>
       articlePersisted(article)
-    case msg @ UpdateFeedResponse(request) =>
+    case UpdateFeedResponse(request) =>
       feedUpdated(request.feed)
       finished()
     case ReceiveTimeout =>

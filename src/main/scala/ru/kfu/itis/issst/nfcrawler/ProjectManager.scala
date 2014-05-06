@@ -9,6 +9,7 @@ import scala.collection.mutable.ListBuffer
 import akka.actor.ActorRef
 import akka.actor.Terminated
 import scala.collection.{ mutable => mu }
+import akka.event.LoggingReceive
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -22,7 +23,7 @@ class ProjectManager extends Actor with ActorLogging {
   private var managerCounter = 0
   private var doorClosed = false
 
-  override def receive = {
+  override def receive = LoggingReceive {
     case RegisterManager(manRef) =>
       managers += manRef
       managerCounter += 1

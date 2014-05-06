@@ -12,6 +12,7 @@ import dao.FeedArticleDao
 import ru.kfu.itis.issst.nfcrawler.{ dao => daopack }
 import akka.actor.ActorLogging
 import akka.actor.Actor
+import akka.event.LoggingReceive
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -22,7 +23,7 @@ class DaoManager(daoConfig: DaoConfig) extends Actor with ActorLogging {
 
   override val toString = "DaoManager"
 
-  override def receive = {
+  override def receive = LoggingReceive {
     case msg @ FeedRequest(feedUrl) =>
       sender ! FeedResponse(getFeed(feedUrl), msg)
     case msg @ ArticleRequest(articleUrl) =>

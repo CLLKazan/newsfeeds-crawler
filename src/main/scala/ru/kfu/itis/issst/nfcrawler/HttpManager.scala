@@ -15,6 +15,7 @@ import scala.concurrent.duration._
 import akka.actor.ReceiveTimeout
 import HttpManager._
 import akka.actor.Props
+import akka.event.LoggingReceive
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
@@ -42,12 +43,12 @@ class HttpManager(config: HttpConfig) extends Actor with ActorLogging { manager 
 
   context.setReceiveTimeout(hostAccessInterval milliseconds)
 
-  override def receive = {
+  override def receive = LoggingReceive {
     case msg @ FeedContentRequest(feedUrl) =>
       addTask(feedUrl, sender, new FeedContentResponse(_, msg))
     case msg @ ArticlePageRequest(articleUrl, articleIdOpt) =>
       addTask(articleUrl, sender, new ArticlePageResponse(_, msg))
-    case msg @ Downloaded(url, time) =>
+    case Downloaded(url, time) =>
       hostAccessMap(url.getHost()) = new AccessPerformed(time)
       handleFreeWorker(taskList, sender)
     case ReceiveTimeout =>
