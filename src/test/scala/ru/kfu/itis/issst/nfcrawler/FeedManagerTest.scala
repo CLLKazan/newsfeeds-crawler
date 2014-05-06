@@ -123,6 +123,40 @@ class FeedManagerTest extends FlatSpec {
     httpProbe.expectMsg(
       ArticlePageRequest("http://example.com/items/3", Some(3)))
   }
+  
+  it should "download content of an updated article if the previous timestamp is null)" in { f =>
+    implicit val actSys = f.actSys
+    val httpProbe = TestProbe()
+    val feedManager = actSys.actorOf(Props(
+      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
+        parsedItemsMap("http://example.com/items/3") =
+          new ParsedFeedItem("http://example.com/items/3", today)
+        feed = new Feed(100, "http://example.com/rss", null)
+      }))
+    feedManager ! ArticleResponse(
+      Some(new Article(3, "http://example.com/items/3", null, "some text", 100)),
+      ArticleRequest("http://example.com/items/3"))
+    httpProbe.expectMsg(
+      ArticlePageRequest("http://example.com/items/3", Some(3)))
+  }
+  
+  it should "ignore an article with the same timestamp" in { f =>
+    implicit val actSys = f.actSys
+    val httpProbe = TestProbe()
+    val feedManager = actSys.actorOf(Props(
+      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
+        parsedItemsMap("http://example.com/items/3") =
+          new ParsedFeedItem("http://example.com/items/3", dayBefore)
+        // add one more to avoid further step
+        parsedItemsMap("http://exampl.com/items/4") =
+          new ParsedFeedItem("http://example.com/items/4", today)
+        feed = new Feed(100, "http://example.com/rss", null)
+      }))
+    feedManager ! ArticleResponse(
+      Some(new Article(3, "http://example.com/items/3", dayBefore, "some text", 100)),
+      ArticleRequest("http://example.com/items/3"))
+    httpProbe.expectNoMsg(5 seconds)
+  }
 
   it should "stop itself eventually if it does not receive answer from daoManager" in { f =>
     pending
