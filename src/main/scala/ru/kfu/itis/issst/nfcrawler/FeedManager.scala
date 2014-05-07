@@ -14,11 +14,11 @@ import java.util.Calendar
 import akka.actor.ActorRef
 import akka.event.Logging
 import akka.actor.Actor
-import akka.actor.ActorLogging
 import scala.concurrent.duration._
 import akka.actor.ReceiveTimeout
 import akka.event.LoggingReceive
 import ru.kfu.itis.issst.nfcrawler.config.FeedConfig
+import ru.kfu.itis.issst.nfcrawler.util.ActorLogging
 
 /**
  * @author Rinat Gareev (Kazan Federal University)

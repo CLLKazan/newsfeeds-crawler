@@ -34,7 +34,7 @@ object Bootstrap extends Logging {
     // -- text extraction layer
     val extractionManager = actSys.actorOf(Props(new ExtractionManager(config)), "extractionManager")
     // create main actor
-    val projectManager = actSys.actorOf(Props[ProjectManager])
+    val projectManager = actSys.actorOf(Props[ProjectManager], "projectManager")
     // -- feed managers
     import ProjectManager._
     for (url <- config.feeds) {

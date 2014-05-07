@@ -8,8 +8,8 @@ import Messages._
 import extraction.TextExtractor
 import util.ErrorDumping
 import akka.actor.Actor
-import akka.actor.ActorLogging
 import akka.event.LoggingReceive
+import ru.kfu.itis.issst.nfcrawler.util.ActorLogging
 
 /**
  * @author Rinat Gareev (Kazan Federal University)

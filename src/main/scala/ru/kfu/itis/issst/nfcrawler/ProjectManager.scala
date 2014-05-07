@@ -4,12 +4,12 @@
 package ru.kfu.itis.issst.nfcrawler
 
 import akka.actor.Actor
-import akka.actor.ActorLogging
 import scala.collection.mutable.ListBuffer
 import akka.actor.ActorRef
 import akka.actor.Terminated
 import scala.collection.{ mutable => mu }
 import akka.event.LoggingReceive
+import ru.kfu.itis.issst.nfcrawler.util.ActorLogging
 
 /**
  * @author Rinat Gareev (Kazan Federal University)

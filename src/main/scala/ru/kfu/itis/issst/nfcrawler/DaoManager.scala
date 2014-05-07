@@ -10,9 +10,9 @@ import dao.Article
 import dao.Feed
 import dao.FeedArticleDao
 import ru.kfu.itis.issst.nfcrawler.{ dao => daopack }
-import akka.actor.ActorLogging
 import akka.actor.Actor
 import akka.event.LoggingReceive
+import ru.kfu.itis.issst.nfcrawler.util.ActorLogging
 
 /**
  * @author Rinat Gareev (Kazan Federal University)

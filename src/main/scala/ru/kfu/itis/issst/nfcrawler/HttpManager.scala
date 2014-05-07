@@ -8,7 +8,6 @@ import Messages._
 import java.net.URL
 import scala.collection.{ mutable => muta }
 import scala.collection.mutable.DoubleLinkedList
-import akka.actor.ActorLogging
 import akka.actor.Actor
 import akka.actor.ActorRef
 import scala.concurrent.duration._
@@ -16,6 +15,7 @@ import akka.actor.ReceiveTimeout
 import HttpManager._
 import akka.actor.Props
 import akka.event.LoggingReceive
+import ru.kfu.itis.issst.nfcrawler.util.ActorLogging
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
