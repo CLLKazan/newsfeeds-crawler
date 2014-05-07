@@ -17,22 +17,24 @@ import java.net.URL
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-trait Configuration extends AnyRef
+trait Configuration extends AnyRef with FeedConfig
   with DaoConfig with HttpConfig with ParserConfig with ExtractionConfig {
   val feeds: Set[URL]
 
   override def toString(): String = ("feeds: %s\n" +
+    "maxWaitingTimeBeforeStop: %s\n" +
     "hostAccessInterval: %s\n" +
     "httpWorkers: %s\n" +
     "clientHttpParams: %s\n" +
     "dbUrl: %s\n" +
     "dbUsername: %s")
-    .format(feeds.mkString("\n\t", "\n\t", ""),
+    .format(feeds.mkString("\n\t", "\n\t", ""), maxWaitingTimeBeforeStop,
       hostAccessInterval, httpWorkersNumber, clientHttpParams, dbUrl, dbUserName)
 }
 
 object Configuration {
   val FeedKeyPrefix = "feed."
+  val MaxWaitingTimeBeforeStop = "feedManager.maxWaitingTimeBeforeStop"
   val HostAccessInterval = "http.hostAccessInterval"
   val HttpWorkersNumber = "http.workersNum"
   val HttpClientParamPrefix = "httpClient."
@@ -69,6 +71,7 @@ object Configuration {
     // 
     new Configuration() {
       override val feeds = feedSet
+      override val maxWaitingTimeBeforeStop = getIntProperty(MaxWaitingTimeBeforeStop)
       override val hostAccessInterval = getIntProperty(HostAccessInterval)
       override val httpWorkersNumber = getIntProperty(HttpWorkersNumber)
       override val clientHttpParams = httpClientMap

@@ -39,7 +39,7 @@ object Bootstrap extends Logging {
     import ProjectManager._
     for (url <- config.feeds) {
       val feedManager = actSys.actorOf(Props(
-        new FeedManager(feedUrl = url,
+        new FeedManager(feedUrl = url, cfg = config,
           daoManager = daoManager,
           httpManager = httpManager,
           parsingManager = parsingManager,

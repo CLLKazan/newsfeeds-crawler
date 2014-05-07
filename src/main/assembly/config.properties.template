@@ -1,6 +1,7 @@
 feed.ex=http://example.com/rss
 feed.ex2=http://example2.com/rss/
 # feed.any-legal-key=feed url
+feedManager.maxWaitingTimeBeforeStop=60000
 db.username=foouser
 db.password=bar
 db.url=jdbc:someengine:some

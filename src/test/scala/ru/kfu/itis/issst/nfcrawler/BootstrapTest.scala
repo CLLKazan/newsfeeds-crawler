@@ -119,7 +119,7 @@ class BootstrapTest extends FunSuite with MockitoSugar {
     when(dao.getFeed(feedUrl2.toString)).thenReturn(Some(new Feed(100, feedUrl2, null)))
     doThrow(new RuntimeException).when(dao).getArticle(any())
 
-    Bootstrap.start(makeConfig(feedUrl1, feedUrl2))
+    Bootstrap.start(makeConfig(feedUrl1, feedUrl2)).awaitTermination
   }
 
   test("Test workflow with http errors") {
@@ -141,7 +141,7 @@ class BootstrapTest extends FunSuite with MockitoSugar {
 
     doThrow(new RuntimeException).when(http).getContent(any())
 
-    Bootstrap.start(makeConfig(feedUrl1, feedUrl2))
+    Bootstrap.start(makeConfig(feedUrl1, feedUrl2)).awaitTermination
   }
 
   test("Test workflow with parser errors") {
@@ -166,7 +166,7 @@ class BootstrapTest extends FunSuite with MockitoSugar {
     }))
     doThrow(new RuntimeException).when(parser).parseFeed(anyString())
 
-    Bootstrap.start(makeConfig(feedUrl1, feedUrl2))
+    Bootstrap.start(makeConfig(feedUrl1, feedUrl2)).awaitTermination
   }
 
   test("Test workflow with extractor errors") {
@@ -205,10 +205,11 @@ class BootstrapTest extends FunSuite with MockitoSugar {
       .thenReturn(parsedFeed2)
 
     doThrow(new RuntimeException).when(textExtractor).extractFromHtml(anyString)
-    Bootstrap.start(makeConfig(feedUrl1, feedUrl2))
+    Bootstrap.start(makeConfig(feedUrl1, feedUrl2)).awaitTermination
   }
 
   private def makeConfig(urls: URL*) = new Configuration() {
+    val maxWaitingTimeBeforeStop = 10000
     val feeds = Set(urls: _*)
     val hostAccessInterval = 1000
     val httpWorkersNumber = 3

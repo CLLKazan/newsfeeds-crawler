@@ -17,6 +17,7 @@ class ConfigurationTest extends FunSuite {
     import config._
     assert(feeds.toSet ===
       Set("http://example.com/rss", "http://example2.com/rss/").map(new URL(_)))
+    assert(maxWaitingTimeBeforeStop === 55000)
     assert(dbUserName === "foouser")
     assert(dbPassword === "bar")
     assert(dbUrl === "jdbc:someengine:some")

@@ -28,16 +28,21 @@ class ProjectManager extends Actor with ActorLogging {
       managers += manRef
       managerCounter += 1
       context watch manRef
-      log.info("Director {} has arrived")
+      log.info("Director {} has arrived", manRef)
       manRef ! Messages.Initialize
     case CloseDoors =>
       doorClosed = true
       log.info("Watching over {} managers", managerCounter)
+      check()
     case Terminated(manRef) =>
       if (!(managers remove manRef)) {
         log.warning("Unknown manager reference: {}", manRef)
       }
-      if (managers.isEmpty && doorClosed) closeProject()
+      check()
+  }
+
+  private def check() {
+    if (managers.isEmpty && doorClosed) closeProject()
   }
 
   private def closeProject() {

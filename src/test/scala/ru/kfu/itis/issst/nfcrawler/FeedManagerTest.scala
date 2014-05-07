@@ -4,6 +4,7 @@
 package ru.kfu.itis.issst.nfcrawler
 
 import akka.actor.ActorSystem
+import akka.actor.ActorRef
 import akka.testkit.TestKit
 import org.scalatest.FlatSpecLike
 import org.scalatest.fixture.FlatSpec
@@ -16,12 +17,13 @@ import ru.kfu.itis.issst.nfcrawler.dao._
 import ru.kfu.itis.issst.nfcrawler.parser._
 import org.apache.commons.lang3.time.DateUtils
 import java.util.Date
+import ru.kfu.itis.issst.nfcrawler.config.FeedConfig
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class FeedManagerTest extends FlatSpec {
+class FeedManagerTest extends FlatSpec with ActorSystemFixture {
 
   import FeedManagerTest._
   import Messages._
@@ -29,41 +31,66 @@ class FeedManagerTest extends FlatSpec {
   behavior of "FeedManager"
 
   it should "not start working until Initialize is sent" in { f =>
-    pending
-  }
-
-  it should "tell DaoManager after own initialization" in { f =>
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg,
+        daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+    daoProbe.expectNoMsg()
+  }
+
+  it should "tell DaoManager after own initialization and stop when no answer is received" in { f =>
+    implicit val actSys = f.actSys
+    val daoProbe = TestProbe()
+    val observer = TestProbe()
+    val feedManager = actSys.actorOf(Props(
+      new FeedManager(TestFeedUrl, testFeedCfg,
+        daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+    observer watch feedManager
     feedManager ! Initialize
     daoProbe.expectMsg(FeedRequest(TestFeedUrl))
+    observer.expectTerminated(feedManager)
   }
 
-  it should "tell HttpManager to download a feed content" in { f =>
+  it should "tell HttpManager to download a feed content and stop when no answer is received" in { f =>
     implicit val actSys = f.actSys
     val httpProbe = TestProbe()
+    val observer = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref)))
+    observer watch feedManager
     feedManager ! FeedResponse(new Feed(1, TestFeedUrl, null), FeedRequest(TestFeedUrl))
     httpProbe.expectMsg(FeedContentRequest(TestFeedUrl))
+    observer.expectTerminated(feedManager)
   }
 
-  it should "tell ParsingManager to parse a feed content" in { f =>
+  it should "stop if downloading of a feed content is failed" in { f =>
+    implicit val actSys = f.actSys
+    val observer = TestProbe()
+    val feedManager = actSys.actorOf(Props(
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+    observer watch feedManager
+    feedManager ! FeedContentResponse(null, FeedContentRequest(TestFeedUrl))
+    observer.expectTerminated(feedManager)
+  }
+
+  it should "tell ParsingManager to parse a feed content and stop when no answer is received" in { f =>
     implicit val actSys = f.actSys
     val parsingProbe = TestProbe()
+    val observer = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, TestProbe().ref, parsingProbe.ref, TestProbe().ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, parsingProbe.ref, TestProbe().ref)))
+    observer watch feedManager
     feedManager ! FeedContentResponse("some-feed-xml", FeedContentRequest(TestFeedUrl))
     parsingProbe.expectMsg(FeedParsingRequest("some-feed-xml"))
+    observer.expectTerminated(feedManager)
   }
 
   it should "stop if parsing of a feed content is failed" in { f =>
     implicit val actSys = f.actSys
     val observer = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
     observer.watch(feedManager)
     feedManager ! FeedParsingResponse(null, FeedParsingRequest("some-feed-xml"))
     observer.expectTerminated(feedManager, 10 seconds)
@@ -73,7 +100,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val observer = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
     observer.watch(feedManager)
     feedManager ! FeedParsingResponse(
       new ParsedFeed(null, Nil),
@@ -85,7 +112,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref)))
     val parsedFeed = new ParsedFeed(null,
       new ParsedFeedItem("http://example.com/items/1", null) ::
         new ParsedFeedItem("http://example.com/items/2", null) :: Nil)
@@ -99,7 +126,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val httpProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/3") =
           new ParsedFeedItem("http://example.com/items/3", null)
       }))
@@ -112,7 +139,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val httpProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/3") =
           new ParsedFeedItem("http://example.com/items/3", today)
         feed = new Feed(100, "http://example.com/rss", null)
@@ -128,7 +155,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val httpProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/3") =
           new ParsedFeedItem("http://example.com/items/3", today)
         feed = new Feed(100, "http://example.com/rss", null)
@@ -144,7 +171,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val httpProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, httpProbe.ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/3") =
           new ParsedFeedItem("http://example.com/items/3", dayBefore)
         // add one more to avoid further step
@@ -162,7 +189,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val extractorProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, TestProbe().ref, TestProbe().ref, extractorProbe.ref)))
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, TestProbe().ref, extractorProbe.ref)))
     feedManager ! ArticlePageResponse("some-page-html",
       new ArticlePageRequest("http://example.com/items/5", Some(5)))
     extractorProbe.expectMsg(
@@ -173,7 +200,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val extractorProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, TestProbe().ref, TestProbe().ref, extractorProbe.ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, TestProbe().ref, extractorProbe.ref) {
         parsedItemsMap("http://example.com/items/5") = new ParsedFeedItem("http://example.com/items/5", null)
         parsedItemsMap("http://example.com/items/6") = new ParsedFeedItem("http://example.com/items/6", null)
       }))
@@ -186,7 +213,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/6") = new ParsedFeedItem("http://example.com/items/6", dayBefore)
         feed = new Feed(100, "http://example.com", null)
       }))
@@ -200,7 +227,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/7") = new ParsedFeedItem("http://example.com/items/7", dayBefore)
         feed = new Feed(200, "http://example.com", null)
       }))
@@ -214,7 +241,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/8") = new ParsedFeedItem("http://example.com/items/8", dayBefore)
       }))
     val request = ExtractTextRequest("some-page-html", "http://example.com/items/8", Some(8))
@@ -226,7 +253,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/9") = new ParsedFeedItem("http://example.com/items/9", dayBefore)
         feed = new Feed(100, "http://example.com/rss", dayBefore)
         parsedFeed = new ParsedFeed(today, parsedItemsMap("http://example.com/items/9") :: Nil)
@@ -241,7 +268,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         parsedItemsMap("http://example.com/items/9") = new ParsedFeedItem("http://example.com/items/9", dayBefore)
         parsedItemsMap("http://example.com/items/10") = new ParsedFeedItem("http://example.com/items/10", today)
         feed = new Feed(100, "http://example.com/rss", dayBefore)
@@ -256,7 +283,7 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val daoProbe = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, daoProbe.ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         // not updated
         parsedItemsMap("http://example.com/items/1") = new ParsedFeedItem("http://example.com/items/1", dayBefore)
         // can't download
@@ -290,37 +317,13 @@ class FeedManagerTest extends FlatSpec {
     implicit val actSys = f.actSys
     val observer = TestProbe()
     val feedManager = actSys.actorOf(Props(
-      new FeedManager(TestFeedUrl, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
+      new FeedManager(TestFeedUrl, testFeedCfg, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref) {
         parsedFeed = new ParsedFeed(today, Nil)
       }))
     observer watch feedManager
     val feed = new Feed(300, "http://example.com/rss", today)
     feedManager ! UpdateFeedResponse(UpdateFeedRequest(feed))
     observer.expectTerminated(feedManager)
-  }
-
-  it should "stop itself eventually if it does not receive answer from daoManager" in { f =>
-    pending
-  }
-
-  it should "stop itself eventually if it does not receive answer from parsingManager" in { f =>
-    pending
-  }
-
-  it should "stop itself eventually if it does not receive answer from extractionManager" in { f =>
-    pending
-  }
-
-  protected case class FixtureParam(actSys: ActorSystem)
-
-  override def withFixture(test: OneArgTest) = {
-    val actSys = ActorSystem("FeedManagerTest", ConfigFactory.load("test-application"))
-    val fp = new FixtureParam(actSys)
-    try {
-      withFixture(test.toNoArgTest(fp))
-    } finally {
-      actSys.shutdown()
-    }
   }
 }
 
@@ -331,4 +334,8 @@ object FeedManagerTest {
 
   val today = new Date
   val dayBefore = DateUtils.addDays(today, -1);
+
+  private val testFeedCfg = new FeedConfig {
+    override val maxWaitingTimeBeforeStop = 2000
+  }
 }

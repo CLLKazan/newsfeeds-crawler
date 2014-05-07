@@ -18,16 +18,19 @@ import akka.actor.ActorLogging
 import scala.concurrent.duration._
 import akka.actor.ReceiveTimeout
 import akka.event.LoggingReceive
+import ru.kfu.itis.issst.nfcrawler.config.FeedConfig
 
 /**
  * @author Rinat Gareev (Kazan Federal University)
  *
  */
-class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
+class FeedManager(feedUrl: URL, cfg: FeedConfig, daoManager: ActorRef, httpManager: ActorRef,
   parsingManager: ActorRef, extractionManager: ActorRef)
   extends Actor with ActorLogging {
 
-  context.setReceiveTimeout(10 seconds)
+  require(cfg.maxWaitingTimeBeforeStop > 0,
+    s"Illegal maxWaitingTimeBeforeStop: ${cfg.maxWaitingTimeBeforeStop}")
+  context.setReceiveTimeout(cfg.maxWaitingTimeBeforeStop milliseconds)
 
   protected var feed: Feed = null
   protected var parsedFeed: ParsedFeed = null
@@ -62,7 +65,8 @@ class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
       feedUpdated(request.feed)
       finished()
     case ReceiveTimeout =>
-      log.warning("Starving...")
+      log.error("Did not receive any message for {} ms. Going to stop...", cfg.maxWaitingTimeBeforeStop)
+      context.stop(context.self)
   }
 
   private def handleFeedContent(content: String) {
@@ -164,10 +168,13 @@ class FeedManager(feedUrl: URL, daoManager: ActorRef, httpManager: ActorRef,
   private def finished() {
     log.info("All tasks for feed '{}' are performed. Last pub timestamp: {}",
       feedUrl, parsedFeed.pubDate)
+    context.stop(context.self)
+  }
+
+  override def postStop() {
     // clean state
     parsedItemsMap = null
     parsedFeed = null
-    context.stop(context.self)
   }
 
   private def unknownParsedUrl(url: URL): Nothing = throw new IllegalStateException(
